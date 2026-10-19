@@ -86,6 +86,17 @@ svg.chart text{fill:var(--muted);font-size:10px}
 #toast.on{opacity:1}
 label.sw{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--line)}
 label.sw input{width:auto}
+.exhead{display:flex;gap:10px;align-items:center;min-width:0;cursor:pointer}
+.thumb{width:44px;height:44px;flex:0 0 44px;border-radius:8px;object-fit:cover;background:#fff}
+.thumb.ph{display:flex;align-items:center;justify-content:center;background:var(--card2);color:var(--muted);font-weight:700}
+.anim{position:relative;background:#fff;border-radius:12px;overflow:hidden;aspect-ratio:3/2;margin:10px 0}
+.anim img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain}
+.anim img+img{animation:flip 1.6s infinite}
+@keyframes flip{0%,45%{opacity:0}50%,95%{opacity:1}100%{opacity:0}}
+.bodymap{display:flex;gap:12px;justify-content:center;margin:8px 0}
+.body{height:190px;width:auto}
+.body .m{fill:#3a3f4b}.body .m.s{fill:#ff6b3570}.body .m.p{fill:var(--acc)}
+.dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:4px}.dot.p{background:var(--acc)}.dot.s{background:#ff6b3570}
 </style>
 </head>
 <body>
@@ -101,6 +112,7 @@ label.sw input{width:auto}
 <div id="modal"></div>
 <div id="toast"></div>
 <script src="data.js"></script>
+<script src="media.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

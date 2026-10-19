@@ -83,7 +83,13 @@ with sync_playwright() as pw:
     # 분석 / 신체 / 설정 탭
     p.click('#modal [data-a="close"]')
     p.click('[data-a="tab:stats"]'); assert '3대 운동' in p.inner_text('#app'); shot(p, '3_stats')
-    p.click('[data-a^="exd:"] >> nth=0'); assert '추정 1RM' in p.inner_text('#modal'); p.click('[data-a="close"]')
+    p.click('[data-a^="exd:"] >> nth=0'); assert '추정 1RM' in p.inner_text('#modal')
+    # 운동 그림 + 근육 지도
+    assert p.locator('#modal .anim img').count() == 2 and p.locator('#modal polygon.p').count() > 0
+    assert '주동근' in p.inner_text('#modal')
+    p.wait_for_function("[...document.querySelectorAll('#modal .anim img')].every(i=>i.complete&&i.naturalWidth>0)", timeout=15000)
+    shot(p, '3b_exdetail'); p.click('[data-a="close"]')
+    assert p.evaluate("Object.keys(EX).filter(n=>!MEDIA[n]).length") == 5
     p.click('[data-a="tab:body"]'); p.fill('#b_w', '75'); p.fill('#b_f', '15'); p.click('[data-a="bodyAdd"]')
     assert 'FFMI' in p.inner_text('#app'); shot(p, '4_body')
     p.click('[data-a="tab:settings"]'); p.check('[data-s="rpe"]')

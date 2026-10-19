@@ -147,6 +147,25 @@ async function wake(on) {
 }
 document.addEventListener('visibilitychange', () => { if (!document.hidden && ui.view === 'workout') wake(true); });
 
+// ---------- 운동 그림 · 근육 지도 ----------
+const IMG_BASE = 'https://cdn.jsdelivr.net/gh/yuhonas/free-exercise-db@f00c92c7dcf1216a928a52c3706c7ce8e2f71ed5/exercises/';
+const PART_MUSCLE = { 가슴: ['chest', 'shoulders,triceps'], 등: ['lats,middle back', 'biceps,lower back'], 어깨: ['shoulders', 'triceps,traps'], 하체: ['quadriceps,glutes', 'hamstrings,calves'], 팔: ['biceps,triceps', 'forearms'], 복근: ['abdominals', ''], 유산소: ['quadriceps,calves', 'hamstrings,glutes'], 전신: ['quadriceps,glutes,shoulders', 'hamstrings,lower back,traps'] };
+const MUSCLE_KO = { chest: '가슴', shoulders: '어깨', triceps: '삼두', biceps: '이두', lats: '광배', 'middle back': '등 중앙', 'lower back': '허리', traps: '승모근', abdominals: '복근', quadriceps: '대퇴사두', hamstrings: '햄스트링', glutes: '둔근', calves: '종아리', forearms: '전완', adductors: '내전근', abductors: '외전근', neck: '목' };
+const MUSCLE_POLY = { chest: ['chest'], shoulders: ['front-deltoids', 'back-deltoids'], triceps: ['triceps'], biceps: ['biceps'], lats: ['upper-back'], 'middle back': ['upper-back'], 'lower back': ['lower-back'], traps: ['trapezius'], abdominals: ['abs', 'obliques'], quadriceps: ['quadriceps'], hamstrings: ['hamstring'], glutes: ['gluteal'], calves: ['calves', 'left-soleus', 'right-soleus'], forearms: ['forearm'], adductors: ['adductor'], abductors: ['abductors'], neck: ['neck'] };
+function exMedia(name) {
+  const m = MEDIA[name], [p, s] = m ? [m[1], m[2]] : PART_MUSCLE[ex(name).part] || ['', ''];
+  return { img: m && IMG_BASE + m[0] + '/', p: p ? p.split(',') : [], s: s ? s.split(',') : [] };
+}
+function bodyMap(p, s) {
+  const hi = {};
+  for (const m of s) for (const k of MUSCLE_POLY[m] || []) hi[k] = 's';
+  for (const m of p) for (const k of MUSCLE_POLY[m] || []) hi[k] = 'p';
+  const svg = (side, h) => `<svg viewBox="0 0 1000 ${h}" class="body">${BODY[side].map(([k, ps]) => ps.map(pt => `<polygon points="${pt}" class="m ${hi[k] || ''}"/>`).join('')).join('')}</svg>`;
+  return `<div class="bodymap">${svg('front', 1955)}${svg('back', 2200)}</div>`;
+}
+// ponytail: 썸네일도 원본 jpg(약 70KB)를 씀, 목록이 무거우면 썸네일 생성 서버/빌드로
+const thumb = name => { const m = exMedia(name); return m.img ? `<img class="thumb" loading="lazy" src="${m.img}0.jpg" alt="">` : `<span class="thumb ph">${esc(ex(name).part[0])}</span>`; };
+
 // ---------- 차트 ----------
 function chart(pts, bar, unit = '') {
   if (!bar) pts = pts.filter(p => p.v > 0);
@@ -206,8 +225,8 @@ function cardHTML(d, it, i, mode) {
   }).join('');
   return `<div class="ex ${it.ss ? 'ss' : ''}">
     ${it.ss && d.items[i - 1]?.ss === it.ss ? '<div class="muted small">↳ 슈퍼세트</div>' : ''}
-    <div class="between"><div><div class="name" data-a="exd:${encodeURIComponent(it.ex)}">${esc(it.ex)}</div>
-      <div class="muted">${e.part} · ${e.equip}${it.rest ? ` · 휴식 ${it.rest}초` : ''}${rm}</div></div>
+    <div class="between"><div class="exhead" data-a="exd:${encodeURIComponent(it.ex)}">${thumb(it.ex)}<div><div class="name">${esc(it.ex)}</div>
+      <div class="muted">${e.part} · ${e.equip}${it.rest ? ` · 휴식 ${it.rest}초` : ''}${rm}</div></div></div>
       <button class="ghost auto" data-a="imenu:${i}" style="font-size:20px">⋯</button></div>
     <table class="sets"><colgroup><col style="width:40px">${W ? '<col>' : ''}${cols[0] ? '<col>' : ''}<col>${S.set.rpe ? '<col style="width:58px">' : ''}${W ? '<col style="width:46px">' : ''}</colgroup>
       <thead><tr><th>세트</th>${W ? '<th>이전</th>' : ''}${cols[0] ? `<th>${cols[0]}</th>` : ''}<th>${cols[1]}</th>${S.set.rpe ? '<th>RPE</th>' : ''}${W ? '<th></th>' : ''}</tr></thead>
@@ -344,7 +363,8 @@ const VIEWS = {
         <div class="row"><button data-a="exportData">내보내기</button><button data-a="importData">가져오기</button></div>
         <input type="file" id="importFile" accept=".json,application/json" hidden>
         <p class="muted small">운동 ${S.workouts.length}회 · 루틴 ${S.routines.length}개 · ${f1((localStorage.getItem(KEY) || '').length / 1024)}KB</p></div>
-      <button class="wide ghost danger" data-a="resetAll">전체 초기화</button>`;
+      <button class="wide ghost danger" data-a="resetAll">전체 초기화</button>
+      <p class="muted small" style="text-align:center">운동 이미지: free-exercise-db (Unlicense) · 근육 지도: react-body-highlighter (MIT, © 2020 GV79)</p>`;
   },
 };
 function partStats(from, to) {
@@ -364,7 +384,7 @@ function pickList(m) {
   if (m.part === '최근') names = [...new Set(S.workouts.flatMap(w => w.items.map(it => it.ex)))].filter(n => EX[n]).slice(0, 40);
   else if (m.part !== '전체') names = names.filter(n => EX[n].part === m.part);
   if (q) names = names.filter(n => { const k = n.replace(/\s/g, '').toLowerCase(); return k.includes(q) || cho(k).includes(q); });
-  return names.map(n => `<div class="pick ${m.sel.includes(n) ? 'on' : ''}" data-a="pickTog:${encodeURIComponent(n)}"><div><div>${esc(n)}</div><div class="muted small">${EX[n].part} · ${EX[n].equip}${EX[n].custom ? ' · 직접 추가' : ''}</div></div><b class="auto">${m.sel.includes(n) ? '✓' : ''}</b></div>`).join('') || '<p class="muted">결과 없음</p>';
+  return names.map(n => `<div class="pick ${m.sel.includes(n) ? 'on' : ''}" data-a="pickTog:${encodeURIComponent(n)}"><div class="exhead">${thumb(n)}<div><div>${esc(n)}</div><div class="muted small">${EX[n].part} · ${EX[n].equip}${EX[n].custom ? ' · 직접 추가' : ''}</div></div></div><b class="auto">${m.sel.includes(n) ? '✓' : ''}</b></div>`).join('') || '<p class="muted">결과 없음</p>';
 }
 function platesTxt(w) {
   const bar = S.set.bar, list = S.set.plates.split(',').map(num).filter(x => x > 0).sort((a, b) => b - a);
@@ -419,8 +439,10 @@ const MODALS = {
   day: m => `<div class="between"><h3>${m.ds}</h3>${closeBtn}</div><div class="list">${S.workouts.filter(w => ymd(w.start) === m.ds).map(w => `<div class="between" data-a="wopen:${w.id}"><b>${esc(w.name)}</b><span class="muted auto">${dur(w.end - w.start)} · ${f1(wVol(w))}kg</span></div>`).join('')}</div>`,
   exd: m => {
     const n = m.n, e = ex(n), h = exHistory(n), asc = h.slice(0, 40).reverse(), b = bestOf(n), heavy = e.type === 'w' || e.type === 'b';
-    const pts = k => asc.map(x => ({ l: md(x.w.start), v: sessStats(x.sets, e)[k] }));
+    const pts = k => asc.map(x => ({ l: md(x.w.start), v: sessStats(x.sets, e)[k] })), md2 = exMedia(n), ko = l => l.map(m => MUSCLE_KO[m] || m).join(', ');
     return `<div class="between"><h3>${esc(n)}</h3>${closeBtn}</div><div class="muted">${e.part} · ${e.equip} · ${h.length}회 수행</div>
+      ${md2.img ? `<div class="anim"><img src="${md2.img}0.jpg" alt=""><img src="${md2.img}1.jpg" alt=""></div>` : ''}
+      ${md2.p.length ? `${bodyMap(md2.p, md2.s)}<p style="text-align:center;margin:4px 0 12px"><span class="dot p"></span>주동근 <b>${ko(md2.p)}</b>${md2.s.length ? ` &nbsp;<span class="dot s"></span>보조 ${ko(md2.s)}` : ''}</p>` : ''}
       ${heavy ? `<div class="grid3" style="margin:10px 0"><div class="stat"><span class="muted">추정 1RM</span><b>${f1(b.e1)}</b></div><div class="stat"><span class="muted">최고 중량</span><b>${f1(b.w)}</b></div><div class="stat"><span class="muted">최고 볼륨</span><b>${short(b.vol)}</b></div></div>
         <b>추정 1RM</b>${chart(pts('e1'), false, 'kg')}<b>최고 중량</b>${chart(pts('w'), false, 'kg')}<b>볼륨</b>${chart(pts('vol'), true, 'kg')}`
         : `<b>${COLS[e.type][1]}</b>${chart(pts('r'), false)}`}
