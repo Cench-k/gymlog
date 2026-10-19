@@ -8,7 +8,7 @@ self.addEventListener('activate', e => e.waitUntil(self.clients.claim()));
 self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET') return;
   // 운동 이미지(CDN): 한 번 받으면 캐시에서
-  if (e.request.url.startsWith('https://cdn.jsdelivr.net/gh/yuhonas/')) {
+  if (/^https:\/\/(cdn\.jsdelivr\.net\/gh\/yuhonas\/|static\.exercisedb\.dev\/media\/)/.test(e.request.url)) {
     e.respondWith(caches.open('gymlog-img').then(async c => (await c.match(e.request)) || fetch(e.request).then(r => { if (r.ok || r.type === 'opaque') c.put(e.request, r.clone()); return r; })));
     return;
   }

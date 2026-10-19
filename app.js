@@ -149,12 +149,13 @@ document.addEventListener('visibilitychange', () => { if (!document.hidden && ui
 
 // ---------- 운동 그림 · 근육 지도 ----------
 const IMG_BASE = 'https://cdn.jsdelivr.net/gh/yuhonas/free-exercise-db@f00c92c7dcf1216a928a52c3706c7ce8e2f71ed5/exercises/';
+const GIF_BASE = 'https://static.exercisedb.dev/media/'; // ExerciseDB 무료 V1 애니메이션. 실패하면 사진으로 대체
 const PART_MUSCLE = { 가슴: ['chest', 'shoulders,triceps'], 등: ['lats,middle back', 'biceps,lower back'], 어깨: ['shoulders', 'triceps,traps'], 하체: ['quadriceps,glutes', 'hamstrings,calves'], 팔: ['biceps,triceps', 'forearms'], 복근: ['abdominals', ''], 유산소: ['quadriceps,calves', 'hamstrings,glutes'], 전신: ['quadriceps,glutes,shoulders', 'hamstrings,lower back,traps'] };
 const MUSCLE_KO = { chest: '가슴', shoulders: '어깨', triceps: '삼두', biceps: '이두', lats: '광배', 'middle back': '등 중앙', 'lower back': '허리', traps: '승모근', abdominals: '복근', quadriceps: '대퇴사두', hamstrings: '햄스트링', glutes: '둔근', calves: '종아리', forearms: '전완', adductors: '내전근', abductors: '외전근', neck: '목' };
 const MUSCLE_POLY = { chest: ['chest'], shoulders: ['front-deltoids', 'back-deltoids'], triceps: ['triceps'], biceps: ['biceps'], lats: ['upper-back'], 'middle back': ['upper-back'], 'lower back': ['lower-back'], traps: ['trapezius'], abdominals: ['abs', 'obliques'], quadriceps: ['quadriceps'], hamstrings: ['hamstring'], glutes: ['gluteal'], calves: ['calves', 'left-soleus', 'right-soleus'], forearms: ['forearm'], adductors: ['adductor'], abductors: ['abductors'], neck: ['neck'] };
 function exMedia(name) {
-  const m = MEDIA[name], [p, s] = m ? [m[1], m[2]] : PART_MUSCLE[ex(name).part] || ['', ''];
-  return { img: m && IMG_BASE + m[0] + '/', p: p ? p.split(',') : [], s: s ? s.split(',') : [] };
+  const m = MEDIA[name], [p, s] = m?.[1] ? [m[1], m[2]] : PART_MUSCLE[ex(name).part] || ['', ''];
+  return { img: m?.[0] && IMG_BASE + m[0] + '/', gif: m?.[3] && GIF_BASE + m[3] + '.gif', p: p ? p.split(',') : [], s: s ? s.split(',') : [] };
 }
 function bodyMap(p, s) {
   const hi = {};
@@ -166,12 +167,13 @@ function bodyMap(p, s) {
 // ponytail: 썸네일도 원본 jpg(약 70KB)를 씀, 목록이 무거우면 썸네일 생성 서버/빌드로
 const thumb = (name, zoom) => {
   const m = exMedia(name), a = zoom ? ` data-a="zoom:${encodeURIComponent(name)}"` : '';
+  if (m.gif) return `<img class="thumb" loading="lazy" src="${m.gif}" alt=""${a} onerror="${m.img ? `this.onerror=null;this.src='${m.img}0.jpg'` : 'this.style.visibility=`hidden`'}">`;
   return m.img ? `<img class="thumb" loading="lazy" src="${m.img}0.jpg" alt=""${a}>` : `<span class="thumb ph"${a}>${esc(ex(name).part[0])}</span>`;
 };
 const ko = l => l.map(m => MUSCLE_KO[m] || m).join(', ');
 const mediaHTML = n => {
   const m = exMedia(n);
-  return (m.img ? `<div class="anim"><img src="${m.img}0.jpg" alt=""><img src="${m.img}1.jpg" alt=""></div>` : '') +
+  return (m.gif ? `<div class="anim gif"><img src="${m.gif}" alt="" onerror="${m.img ? `this.onerror=null;this.src='${m.img}0.jpg'` : 'this.parentNode.remove()'}"></div>` : m.img ? `<div class="anim"><img src="${m.img}0.jpg" alt=""><img src="${m.img}1.jpg" alt=""></div>` : '') +
     (m.p.length ? `${bodyMap(m.p, m.s)}<p style="text-align:center;margin:4px 0 12px"><span class="dot p"></span>주동근 <b>${ko(m.p)}</b>${m.s.length ? ` &nbsp;<span class="dot s"></span>보조 ${ko(m.s)}` : ''}</p>` : '');
 };
 
@@ -373,7 +375,7 @@ const VIEWS = {
         <input type="file" id="importFile" accept=".json,application/json" hidden>
         <p class="muted small">운동 ${S.workouts.length}회 · 루틴 ${S.routines.length}개 · ${f1((localStorage.getItem(KEY) || '').length / 1024)}KB</p></div>
       <button class="wide ghost danger" data-a="resetAll">전체 초기화</button>
-      <p class="muted small" style="text-align:center">운동 이미지: free-exercise-db (Unlicense) · 근육 지도: react-body-highlighter (MIT, © 2020 GV79)</p>`;
+      <p class="muted small" style="text-align:center">운동 애니메이션: ExerciseDB · 운동 사진: free-exercise-db (Unlicense) · 근육 지도: react-body-highlighter (MIT, © 2020 GV79)</p>`;
   },
 };
 function partStats(from, to) {
