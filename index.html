@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111318">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="짐로그">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<title>짐로그</title>
+<style>
+:root{--bg:#111318;--card:#1b1e25;--card2:#242832;--line:#2e3340;--text:#eef0f4;--muted:#8a91a1;--acc:#ff6b35;--acc2:#ff6b3522;--ok:#2fbf71;--ok2:#2fbf7122;--bad:#ef4f5f;--warm:#e0b341;--drop:#a77bff;--fail:#ef4f5f;--feed:#4fb3ef;--rp:#ef8f4f}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;background:var(--bg);color:var(--text);font:15px/1.45 -apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Noto Sans KR","Malgun Gothic",sans-serif}
+body{padding:env(safe-area-inset-top) 0 calc(72px + env(safe-area-inset-bottom))}
+body.full{padding-bottom:calc(110px + env(safe-area-inset-bottom))}
+main{max-width:640px;margin:0 auto;padding:12px 16px}
+h1{font-size:22px;margin:8px 0 14px}h2{font-size:17px;margin:22px 0 10px}h3{font-size:15px;margin:0}
+button,input,select,textarea{font:inherit;color:inherit}
+button{background:var(--card2);border:0;border-radius:10px;padding:10px 14px;cursor:pointer}
+button:active{opacity:.7}
+.pri{background:var(--acc);color:#fff;font-weight:700}
+.ghost{background:none;color:var(--muted);padding:6px 8px}
+.danger{color:var(--bad)}
+.wide{width:100%;padding:14px;font-size:16px}
+input,select,textarea{background:var(--card2);border:1px solid var(--line);border-radius:8px;padding:8px 10px;width:100%;min-width:0}
+textarea{resize:vertical;min-height:38px}
+input:focus,select:focus,textarea:focus{outline:2px solid var(--acc);border-color:transparent}
+.card{background:var(--card);border-radius:14px;padding:14px;margin-bottom:12px}
+.row{display:flex;gap:8px;align-items:center}.row>*{flex:1}.row>.auto{flex:0 0 auto}
+.between{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.muted{color:var(--muted);font-size:13px}.small{font-size:12px}
+.up{color:var(--ok)}.down{color:var(--bad)}
+.list>*{border-bottom:1px solid var(--line);padding:10px 0}.list>*:last-child{border:0}
+.chips{display:flex;gap:6px;overflow-x:auto;padding-bottom:4px;scrollbar-width:none}
+.chip{flex:0 0 auto;padding:6px 12px;border-radius:99px;background:var(--card2);font-size:13px}
+.chip.on{background:var(--acc);color:#fff}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px}.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.stat{background:var(--card2);border-radius:10px;padding:10px}.stat b{display:block;font-size:18px}
+nav#tabs{position:fixed;left:0;right:0;bottom:0;display:flex;background:#16191fee;backdrop-filter:blur(8px);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom);z-index:5}
+nav#tabs button{flex:1;background:none;border-radius:0;padding:10px 0 12px;color:var(--muted);font-size:12px}
+nav#tabs button i{display:block;font-style:normal;font-size:20px}
+nav#tabs button.on{color:var(--acc)}
+body.full nav#tabs{display:none}
+/* 운동 편집 */
+.whead{position:sticky;top:0;background:var(--bg);z-index:3;padding:8px 0;margin:-12px 0 8px}
+.ex{background:var(--card);border-radius:14px;padding:12px;margin-bottom:12px;border-left:4px solid transparent}
+.ex.ss{border-left-color:var(--drop)}
+.ex .name{font-weight:700;font-size:16px}
+.sets{width:100%;border-collapse:collapse;margin-top:8px;table-layout:fixed}
+.sets th{font-size:11px;color:var(--muted);font-weight:400;padding:2px}
+.sets td{padding:3px 2px;text-align:center}
+.sets input{text-align:center;padding:8px 2px;font-size:16px}
+.sets tr.done td{background:var(--ok2)}
+.sets tr.done input{border-color:transparent;background:transparent}
+.stype{width:34px;padding:7px 0;font-weight:700;font-size:13px}
+.t-W{color:var(--warm)}.t-D{color:var(--drop)}.t-F{color:var(--fail)}.t-P{color:var(--feed)}.t-R{color:var(--rp)}
+.prev{font-size:12px;color:var(--muted);background:none;padding:4px 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;width:100%}
+.chk{width:40px;padding:8px 0;font-size:16px}
+tr.done .chk{background:var(--ok);color:#fff}
+#rest{position:fixed;left:0;right:0;bottom:0;background:#16191ff2;border-top:1px solid var(--line);padding:10px 16px calc(10px + env(safe-area-inset-bottom));z-index:6}
+#rest .inner{max-width:640px;margin:0 auto}
+#rest .bar{height:4px;background:var(--card2);border-radius:2px;overflow:hidden;margin-bottom:8px}
+#rest .bar div{height:100%;background:var(--acc);transition:width .25s linear}
+#rest .big{font-size:26px;font-weight:800;font-variant-numeric:tabular-nums;flex:0 0 auto;min-width:80px}
+/* 모달 */
+#modal:empty{display:none}
+#modal{position:fixed;inset:0;background:#000a;z-index:10;display:flex;align-items:flex-end;justify-content:center}
+#modal .sheet{background:var(--card);width:100%;max-width:640px;max-height:88vh;overflow:auto;border-radius:18px 18px 0 0;padding:16px 16px calc(16px + env(safe-area-inset-bottom))}
+.opt{display:block;width:100%;text-align:left;background:none;padding:12px 4px;border-bottom:1px solid var(--line);border-radius:0}
+.pick{display:flex;justify-content:space-between;align-items:center;padding:11px 4px;border-bottom:1px solid var(--line)}
+.pick.on{background:var(--acc2)}
+/* 캘린더 */
+.cal{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;text-align:center}
+.cal div{padding:6px 0;border-radius:8px;font-size:13px}
+.cal .hd{color:var(--muted);font-size:11px}
+.cal .w{background:var(--acc);color:#fff;font-weight:700;cursor:pointer}
+.cal .today{outline:1px solid var(--acc)}
+svg.chart{width:100%;height:auto;display:block}
+svg.chart text{fill:var(--muted);font-size:10px}
+#toast{position:fixed;left:50%;top:calc(16px + env(safe-area-inset-top));transform:translateX(-50%);background:#333a;backdrop-filter:blur(6px);padding:10px 16px;border-radius:99px;z-index:20;opacity:0;transition:opacity .2s;pointer-events:none}
+#toast.on{opacity:1}
+label.sw{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--line)}
+label.sw input{width:auto}
+</style>
+</head>
+<body>
+<main id="app"></main>
+<nav id="tabs">
+  <button data-a="tab:home"><i>🏋️</i>운동</button>
+  <button data-a="tab:routines"><i>📋</i>루틴</button>
+  <button data-a="tab:stats"><i>📈</i>분석</button>
+  <button data-a="tab:body"><i>⚖️</i>신체</button>
+  <button data-a="tab:settings"><i>⚙️</i>설정</button>
+</nav>
+<div id="rest" hidden></div>
+<div id="modal"></div>
+<div id="toast"></div>
+<script src="data.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
