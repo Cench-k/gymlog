@@ -58,7 +58,12 @@ with sync_playwright() as pw:
     # 운동 추가: 초성 검색
     p.click('[data-a="pickOpen"]'); p.fill('[data-in="pickq"]', 'ㄹㅍㄷ')
     assert '랫 풀다운' in p.inner_text('#picklist')
-    p.click('[data-a="pickTog:' + '%EB%9E%AB%20%ED%92%80%EB%8B%A4%EC%9A%B4' + '"]'); p.click('[data-a="pickDone"]')
+    # 사진 누르면 크게 보기 -> 거기서 선택
+    p.click('#picklist [data-a="zoom:%EB%9E%AB%20%ED%92%80%EB%8B%A4%EC%9A%B4"]')
+    assert p.is_visible('#zoom .anim') and p.evaluate('ui.modal.sel.length') == 0
+    p.click('#zoom [data-a^="zoomPick:"]')
+    assert not p.locator('#zoom').count() and p.evaluate('ui.modal.sel') == ['랫 풀다운']
+    p.click('[data-a="pickDone"]')
     assert p.evaluate('S.active.items.at(-1).ex') == '랫 풀다운'
     shot(p, '1_workout')
     p.click('[data-a="finish"]')
