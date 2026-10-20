@@ -35,7 +35,19 @@ function sharedReturn() {
 
 // 프로그램 공유: 루틴 폴더 하나 = 프로그램. Supabase gymlog_programs 표에 올리고 로그인한 누구나 가져감
 // ponytail: 최대 200개만 불러옴, 사용자 수백 명 넘으면 검색·페이지 나누기
-const PROG_COLS = 'id,user_id,author,badge,name,descr,days,uses,rating,ratings';
+const PROG_COLS = 'id,user_id,author,badge,photo,name,descr,days,uses,rating,ratings';
+// 프로그램에 같이 올리는 프로필: 닉네임 + (사진 또는 대표 뱃지)
+const PHOTO_OK = /^data:image\/jpeg;base64,[A-Za-z0-9+/=]+$/;
+const myProfile = () => ({ author: (S.set.nick || (SY.email || '').split('@')[0] || '익명').slice(0, 30), badge: S.set.avatar === 'badge' ? S.set.badge.slice(0, 80) : '', photo: S.set.avatar === 'photo' && PHOTO_OK.test(S.set.photo || '') ? S.set.photo : '' });
+// 프로필을 바꾸면 이미 공유한 내 프로그램에도 반영
+function profSync() { if (SY.rt) api(`gymlog_programs?user_id=eq.${SY.uid}`, 'PATCH', myProfile()).catch(() => { }); }
+// 남이 올린 프로필 사진은 JPEG data URL만 그림 (그 외 문자열은 버림)
+function progAvatar(p) {
+  const ph = str(p.photo, 40000), b = badgeInfo(str(p.badge, 80));
+  if (PHOTO_OK.test(ph)) return `<img class="avatar" src="${ph}" alt="">`;
+  if (b) return `<span class="avatar">${medal(b.icon, b.tier)}</span>`;
+  return `<span class="avatar ph">${esc(str(p.author, 30)[0] || '?')}</span>`;
+}
 const PROG_SORT = { 인기순: 'uses.desc,rating.desc.nullslast', 별점순: 'rating.desc.nullslast,ratings.desc', 최신순: 'updated_at.desc' };
 const VOTE_URL = 'gymlog_program_votes?on_conflict=program_id,user_id';
 async function loadShared() {
@@ -59,8 +71,8 @@ function sharedList(m) {
   if (!m.list.length) return '<p class="muted">아직 공유된 프로그램이 없어요. 루틴 탭에서 폴더 이름 옆 "공유"를 눌러 첫 프로그램을 올려 보세요.</p>';
   return (m.mine ? '' : `<div class="chips" style="margin-bottom:10px">${Object.keys(PROG_SORT).map(k => `<button class="chip ${m.sort === k ? 'on' : ''}" data-a="progSort:${k}">${k}</button>`).join('')}</div>`) + list.map(p => { const k = m.list.indexOf(p);
     const mine = p.user_id === SY.uid, days = arr(p.days?.r), my = m.my?.[p.id];
-    return `<div class="card" style="background:var(--card2)"><div class="between"><h3>${esc(str(p.name, 60))}</h3><span class="muted small auto">${num(p.uses)}명 가져감</span></div>
-      <div class="muted row" style="gap:6px">${(b => b ? medal(b.icon, b.tier, 'xs') : '')(badgeInfo(str(p.badge, 80)))}<span class="grow">${p.ratings ? `<b class="gold">★ ${num(p.rating).toFixed(1)}</b> (${num(p.ratings)}) · ` : ''}${esc(str(p.author, 30))}${mine ? ' (나)' : ''} · ${days.length}일 루틴</span></div>
+    return `<div class="card prog" style="background:var(--card2)"><div class="progh">${progAvatar(p)}<div class="grow"><h3>${esc(str(p.name, 60))}</h3>
+      <div class="muted">${p.ratings ? `<b class="gold">★ ${num(p.rating).toFixed(1)}</b> (${num(p.ratings)}) · ` : ''}${esc(str(p.author, 30))}${mine ? ' (나)' : ''} · ${days.length}일 루틴</div></div><span class="muted small auto">${num(p.uses)}명 가져감</span></div>
       ${p.descr ? `<div style="margin:6px 0;white-space:pre-wrap">${esc(str(p.descr, 500))}</div>` : ''}
       <div class="muted small">${days.map(r => esc(str(r?.n, 60))).join(' / ')}</div>
       ${my?.used && !mine ? `<div class="between" style="margin-top:8px"><span class="muted small">내 별점</span><div class="stars">${stars(my.rating, k)}</div></div>` : ''}
@@ -105,7 +117,7 @@ Object.assign(A, {
     const rs = S.routines.filter(r => (r.folder || '기본') === f);
     S.set.nick = nick; save();
     try {
-      await api('gymlog_programs?on_conflict=user_id,name', 'POST', { user_id: SY.uid, author: nick.slice(0, 30), badge: S.set.avatar === 'badge' ? S.set.badge.slice(0, 80) : '', name: name.slice(0, 60), descr: descr.slice(0, 500), days: { r: rs.map(packR), c: packC(rs) }, updated_at: new Date().toISOString() }, 'resolution=merge-duplicates,return=minimal');
+      await api('gymlog_programs?on_conflict=user_id,name', 'POST', { user_id: SY.uid, ...myProfile(), author: nick.slice(0, 30), name: name.slice(0, 60), descr: descr.slice(0, 500), days: { r: rs.map(packR), c: packC(rs) }, updated_at: new Date().toISOString() }, 'resolution=merge-duplicates,return=minimal');
       A.close(); toast('프로그램을 공유했어요');
     } catch (e) { toast('공유 실패: ' + e.message); }
   },

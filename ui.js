@@ -502,7 +502,8 @@ document.addEventListener('change', e => {
   if (el.dataset.s) {
     const k = el.dataset.s;
     S.set[k] = el.type === 'checkbox' ? el.checked : typeof DEF[k] === 'number' ? (el.value.trim() !== '' && isFinite(el.value) ? num(el.value) : DEF[k]) : el.value;
-    save(); if (ui.tab === 'settings' && !ui.view) $('#app').innerHTML = VIEWS.settings(); // 뒤 목록 값만 갱신 (열린 시트 입력은 그대로)
+    save(); if (k === 'nick') profSync();
+    if (ui.tab === 'settings' && !ui.view) $('#app').innerHTML = VIEWS.settings(); // 뒤 목록 값만 갱신 (열린 시트 입력은 그대로)
   }
   if (el.id === 'photoFile' && el.files[0]) setPhoto(el.files[0]);
   if (el.id === 'importFile' && el.files[0]) {

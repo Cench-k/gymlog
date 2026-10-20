@@ -284,7 +284,7 @@ Object.assign(A, {
   bpick(...a) {
     const id = decodeURIComponent(a.join(':'));
     if (!id) return toast('아직 못 딴 업적이에요');
-    S.set.badge = id; S.set.avatar = 'badge'; save(); toast(`프로필 뱃지: ${badgeInfo(id).name}`); render();
+    S.set.badge = id; S.set.avatar = 'badge'; save(); profSync(); toast(`프로필 뱃지: ${badgeInfo(id).name}`); render();
   },
 });
 // 운동 끝낼 때 새로 딴 업적 (ui.js finish에서 전후 비교)

@@ -43,6 +43,10 @@ class H(http.server.SimpleHTTPRequestHandler):
         s.send(201)
     def do_PATCH(s):
         q, b = s.q(), s.body()
+        if s.path.startswith('/rest/v1/gymlog_programs'):
+            for x in PROGS:
+                if x['user_id'] == q['user_id']: x.update(b)
+            return s.send(204)
         with LOCK:
             row = ROWS.get(q['user_id'])
             if not row or row['rev'] != int(q['rev']): return s.send(200, [])
@@ -172,10 +176,14 @@ with sync_playwright() as pw:
     Bd.click('[data-a="pubOpen:StrongLifts%205x5"]'); Bd.wait_for_function("document.querySelector('#p_desc').value")  # 기존 설명 채워짐
     Bd.click('[data-a="pubSave"]'); Bd.wait_for_function('!ui.modal')
     assert len(PROGS) == 1  # 같은 이름은 덮어씀
+    # 프로필 사진을 바꾸면 이미 공유한 프로그램에도 반영, 남이 보는 목록에 사진이 뜸
+    Bd.evaluate("S.set.photo='data:image/jpeg;base64,/9j/AAAA'; S.set.avatar='photo'; save(); profSync()"); Bd.wait_for_timeout(300)
+    assert PROGS[0]['photo'].startswith('data:image/jpeg') and PROGS[0]['badge'] == ''
     F = device(b); login(F, email='f@x.com'); F.wait_for_function('SY.last > 0')
     F.click('[data-a="tab:routines"]'); F.click('[data-a="progs"]'); F.click('[data-a="progTab:shared"]')
     F.wait_for_selector('[data-a="sharedAdd:0"]')
-    assert '<b>초보</b>' in F.inner_text('#modal') and '공유 중단' not in F.inner_text('#modal'), F.inner_text('#modal')
+    assert '<b>초보</b>' in F.inner_text('#modal') and '공유 중단' not in F.inner_text('#modal')
+    assert F.locator('#modal .progh img.avatar').count() == 1, F.inner_text('#modal')
     assert F.locator('[data-a^="rate:"]').count() == 0  # 가져가기 전엔 별점 없음
     F.click('[data-a="sharedAdd:0"]')
     assert F.evaluate("S.routines.filter(r=>r.folder==='StrongLifts 5x5').length") == 2

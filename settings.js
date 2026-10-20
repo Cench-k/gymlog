@@ -111,12 +111,12 @@ async function setPhoto(file) {
   try {
     const img = await createImageBitmap(file), z = Math.min(img.width, img.height), c = Object.assign(document.createElement('canvas'), { width: 160, height: 160 });
     c.getContext('2d').drawImage(img, (img.width - z) / 2, (img.height - z) / 2, z, z, 0, 0, 160, 160);
-    S.set.photo = c.toDataURL('image/jpeg', 0.82); S.set.avatar = 'photo'; save(); render(); toast('프로필 사진을 바꿨어요');
+    S.set.photo = c.toDataURL('image/jpeg', 0.82); S.set.avatar = 'photo'; save(); render(); profSync(); toast('프로필 사진을 바꿨어요');
   } catch (e) { toast('사진을 못 읽었어요: ' + e.message); }
 }
 Object.assign(A, {
   photoPick() { $('#photoFile').click(); },
-  avatarOff() { S.set.avatar = ''; save(); render(); },
+  avatarOff() { S.set.avatar = ''; save(); render(); profSync(); },
   sOpen(k) { ui.modal = { type: 'sset', k }; renderModal(); },
   rmIn() { const m = ui.modal; m.w = $('#rm_w').value; m.r = $('#rm_r').value; $('#rmOut').innerHTML = rmTable(m); },
   ivStart() {
