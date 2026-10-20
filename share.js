@@ -69,7 +69,18 @@ function sharedList(m) {
   const list = m.mine ? m.list.filter(p => p.user_id === SY.uid) : m.list;
   if (m.mine && !list.length) return '<p class="muted">아직 공유한 프로그램이 없어요. 루틴 탭에서 폴더 이름 옆 "공유"를 눌러 보세요.</p>';
   if (!m.list.length) return '<p class="muted">아직 공유된 프로그램이 없어요. 루틴 탭에서 폴더 이름 옆 "공유"를 눌러 첫 프로그램을 올려 보세요.</p>';
-  return (m.mine ? '' : `<div class="chips" style="margin-bottom:10px">${Object.keys(PROG_SORT).map(k => `<button class="chip ${m.sort === k ? 'on' : ''}" data-a="progSort:${k}">${k}</button>`).join('')}</div>`) + list.map(p => { const k = m.list.indexOf(p);
+  return (m.mine ? '' : `<div class="chips" style="margin-bottom:10px">${Object.keys(PROG_SORT).map(k => `<button class="chip ${m.sort === k ? 'on' : ''}" data-a="progSort:${k}">${k}</button>`).join('')}</div><input data-in="progQ" value="${esc(m.q || '')}" placeholder="프로그램·작성자·운동 이름 검색 (초성 가능)" style="margin-bottom:10px">`)
+    + `<div id="proglist">${progItems(m)}</div>`;
+}
+// 검색: 이름·작성자·설명·루틴 이름·운동 이름. 공백 무시, 초성 가능
+// ponytail: 불러온 최대 200개 안에서만 찾음, 프로그램이 수백 개 넘으면 서버 검색(ilike)으로
+const progText = p => [p.name, p.author, p.descr, ...arr(p.days?.r).flatMap(r => [r?.n, ...arr(r?.i).map(it => it?.ex)])].map(x => str(x)).join(' ').replace(/\s/g, '').toLowerCase();
+function progItems(m) {
+  const q = (m.q || '').replace(/\s/g, '').toLowerCase();
+  let list = m.mine ? m.list.filter(p => p.user_id === SY.uid) : m.list;
+  if (q) list = list.filter(p => { const t = progText(p); return t.includes(q) || cho(t).includes(q); });
+  if (!list.length) return `<p class="muted" style="text-align:center;padding:20px 0">${q ? '검색 결과가 없어요.' : ''}</p>`;
+  return list.map(p => { const k = m.list.indexOf(p);
     const mine = p.user_id === SY.uid, days = arr(p.days?.r), my = m.my?.[p.id];
     return `<div class="card prog" style="background:var(--card2)"><div class="progh">${progAvatar(p)}<div class="grow"><h3>${esc(str(p.name, 60))}</h3>
       <div class="muted">${p.ratings ? `<b class="gold">★ ${num(p.rating).toFixed(1)}</b> (${num(p.ratings)}) · ` : ''}${esc(str(p.author, 30))}${mine ? ' (나)' : ''} · ${days.length}일 루틴</div></div><span class="muted small auto">${num(p.uses)}명 가져감</span></div>
@@ -82,6 +93,7 @@ function sharedList(m) {
 Object.assign(A, {
   progTab(k) { ui.modal.tab = k; renderModal(); if (k === 'shared' && SY.rt) loadShared(); },
   progSort(k) { ui.modal.sort = k; loadShared(); },
+  progQ(v) { ui.modal.q = v; $('#proglist').innerHTML = progItems(ui.modal); },
   sharedAdd(k) {
     const p = ui.modal.list[k], folder = str(p.name, 60);
     addCustom(p.days?.c);

@@ -183,7 +183,12 @@ with sync_playwright() as pw:
     F.click('[data-a="tab:routines"]'); F.click('[data-a="progs"]'); F.click('[data-a="progTab:shared"]')
     F.wait_for_selector('[data-a="sharedAdd:0"]')
     assert '<b>초보</b>' in F.inner_text('#modal') and '공유 중단' not in F.inner_text('#modal')
-    assert F.locator('#modal .progh img.avatar').count() == 1, F.inner_text('#modal')
+    assert F.locator('#modal .progh img.avatar').count() == 1
+    # 검색: 운동 이름 초성, 작성자, 없는 말
+    F.fill('[data-in="progQ"]', 'ㅂㅂㅅㅋㅌ'); assert F.locator('#proglist .prog').count() == 1
+    F.fill('[data-in="progQ"]', 'me'); assert F.locator('#proglist .prog').count() == 1
+    F.fill('[data-in="progQ"]', '없는프로그램'); assert F.locator('#proglist .prog').count() == 0 and '검색 결과가 없어요' in F.inner_text('#proglist')
+    F.fill('[data-in="progQ"]', ''), F.inner_text('#modal')
     assert F.locator('[data-a^="rate:"]').count() == 0  # 가져가기 전엔 별점 없음
     F.click('[data-a="sharedAdd:0"]')
     assert F.evaluate("S.routines.filter(r=>r.folder==='StrongLifts 5x5').length") == 2

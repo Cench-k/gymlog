@@ -2,7 +2,7 @@
 // 짐로그: 운동 기록 PWA. 상태 전부 localStorage 한 키에 JSON으로 저장.
 // ponytail: localStorage 약 5MB 한도(운동 기록 수년치는 충분), 넘치면 IndexedDB로 이전.
 
-const APP_VER = '2026.10.20.6'; // 배포할 때 올림. 의견 보내기에 같이 저장돼 어느 버전 문제인지 앎
+const APP_VER = '2026.10.20.7'; // 배포할 때 올림. 의견 보내기에 같이 저장돼 어느 버전 문제인지 앎
 const KEY = 'gymlog.v1';
 const DEF = { height: 175, rest: 90, vibrate: true, sound: true, wake: true, autoRoutine: 'same', rpe: false, nick: '', badge: '', avatar: '', photo: '', didBackup: false, didFeedback: false, fav: [], setN: 3, setR: 10, dbs: '', stepB: 2.5, stepD: 2, stepM: 5, restW: 60, warmEx: true, weekStart: 1, ivWork: 20, ivRest: 10, ivRounds: 8, bar: 20, plates: '25,20,15,10,5,2.5,1.25' };
 const TYPES = { N: '일반', W: '웜업', D: '드롭', F: '실패', P: '피더', R: '레스트-퍼즈' };
