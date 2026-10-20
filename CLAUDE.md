@@ -2,6 +2,24 @@
 
 운동 기록 PWA. 빌드 도구 없음: 정적 파일을 GitHub Pages(https://cench-k.github.io/gymlog/)로 배포. 서버는 Supabase(프로젝트 ref `kbotdssaktcsdbvqlwvq`) 하나.
 
+## 새 PC에서 이어서 하기
+
+1. `git clone https://github.com/Cench-k/gymlog.git` (GitHub 로그인: `gh auth login`)
+2. `npm install` (Capacitor 도구)
+3. 테스트용: `pip install playwright` → `python -m playwright install chromium`
+4. 앱 빌드용: Android Studio 설치 (SDK 포함). iOS는 Mac 또는 GitHub Actions macOS
+5. 의견함 스크립트를 쓸 거면 Supabase 대시보드에서 비밀 키를 새로 만들어 `%USERPROFILE%\.gymlog-admin.env`에 `SUPABASE_SECRET_KEY=...` (키 파일은 PC끼리 복사하지 말고 PC마다 새로 만들고, 안 쓰는 PC의 키는 대시보드에서 지움)
+
+## 배경 · 결정 사항
+
+- 목표: 라이즈(RISE) 운동 기록 앱의 장점을 모은 앱. 처음엔 지인 10명, 이후 양쪽 스토어 출시. 수익은 AdMob 광고만 (구독 없음)
+- 서버: Supabase 프로젝트 `gymlog` (ref `kbotdssaktcsdbvqlwvq`, 시드니, 무료). 공개 키는 sync.js에 있음 (RLS로 보호). 다른 프로젝트 `ojmfrsikzaengqjjxzxx`는 다른 앱 DB라 절대 쓰지 않음
+- 로그인: 이메일 + 구글 (Google Cloud 프로젝트 `gymlog-512108`의 OAuth 웹 클라이언트, Supabase Auth에 연결). Supabase site_url은 Pages 주소, 허용 주소에 `http://localhost:3000/**`도 있음 (PC 테스트용: `python -m http.server 3000`)
+- 동기화: 유저당 한 행에 전체 기록(jsonb), 레코드별 수정 시각으로 병합. 사용자 수십 명 넘으면 레코드별 행으로 나눌 것
+- 레벨은 숫자만 (등급 이름 없음). 운동 이미지는 퍼블릭 도메인 사진만 (아래 주의 참고)
+- 출시 순서: Capacitor 안드로이드 빌드 → AdMob(테스트 광고) + 휴식 알림을 앱 알림으로 → 앱 안 계정 삭제·개인정보처리방침·Apple 로그인·앱용 구글 로그인 → iOS
+- 진행 상황은 `git log`로 확인
+
 ## 파일
 
 스크립트는 일반 `<script>`로 index.html 순서대로 읽고 전역을 공유한다. 뒤 파일이 앞 파일의 `A`(버튼 동작), `MODALS`(팝업), `VIEWS`(탭 화면)에 항목을 추가하는 방식.
