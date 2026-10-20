@@ -1,6 +1,6 @@
 # 짐로그 (gymlog)
 
-운동 기록 PWA. 빌드 도구 없음: 정적 파일을 GitHub Pages(https://cench-k.github.io/gymlog/)로 배포. 서버는 Supabase(프로젝트 ref `kbotdssaktcsdbvqlwvq`) 하나.
+운동 기록 PWA. 빌드 도구 없음: 정적 파일을 GitHub Pages(https://cench-k.github.io/gymlog/)로 배포. 서버는 Supabase(프로젝트 ref `biixaxptjizezwethdsr`, 서울) 하나.
 
 ## 세션 규칙 (PC 여러 대에서 번갈아 작업)
 
@@ -19,9 +19,9 @@
 ## 배경 · 결정 사항
 
 - 목표: 라이즈(RISE) 운동 기록 앱의 장점을 모은 앱. 처음엔 지인 10명, 이후 양쪽 스토어 출시. 수익은 AdMob 광고만 (구독 없음)
-- 서버: Supabase 프로젝트 `gymlog` (ref `kbotdssaktcsdbvqlwvq`, 시드니, 무료). 공개 키는 sync.js에 있음 (RLS로 보호). 다른 프로젝트 `ojmfrsikzaengqjjxzxx`는 다른 앱 DB라 절대 쓰지 않음
+- 서버: Supabase 프로젝트 `gymlog` (ref `biixaxptjizezwethdsr`, 서울, 무료). 2026-10-20 시드니(`kbotdssaktcsdbvqlwvq`, 데이터 0건)에서 옮김. 공개 키는 sync.js에 있음 (RLS로 보호). 다른 프로젝트 `ojmfrsikzaengqjjxzxx`는 다른 앱 DB라 절대 쓰지 않음
 - 로그인: 이메일 + 구글 (Google Cloud 프로젝트 `gymlog-512108`의 OAuth 웹 클라이언트, Supabase Auth에 연결). Supabase site_url은 Pages 주소, 허용 주소에 `http://localhost:3000/**`도 있음 (PC 테스트용: `python -m http.server 3000`)
-- 동기화: 유저당 한 행에 전체 기록(jsonb), 레코드별 수정 시각으로 병합. 사용자 수십 명 넘으면 레코드별 행으로 나눌 것
+- 동기화: 기록 하나 = `gymlog_recs` 한 행. 바뀐 것만 올리고(`rpc/gymlog_push`, 수정 시각 u가 큰 쪽이 이김) 커서 이후 바뀐 것만 받음. 커서 없는 기기는 가진 기록을 전부 올리므로 서버를 옮겨도 기기에서 복구됨
 - 레벨은 숫자만 (등급 이름 없음). 운동 이미지는 퍼블릭 도메인 사진만 (아래 주의 참고)
 - 출시 순서: Capacitor 안드로이드 빌드 → AdMob(테스트 광고) + 휴식 알림을 앱 알림으로 → 앱 안 계정 삭제·개인정보처리방침·Apple 로그인·앱용 구글 로그인 → iOS
 - 진행 상황은 `git log`로 확인

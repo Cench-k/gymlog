@@ -11,7 +11,7 @@
 import json, os, sys, urllib.request, urllib.parse
 from pathlib import Path
 
-URL = 'https://kbotdssaktcsdbvqlwvq.supabase.co'
+URL = 'https://biixaxptjizezwethdsr.supabase.co'
 KIND = {'bug': '버그', 'idea': '아이디어', 'etc': '기타'}
 STATUS = {'new': '접수', 'seen': '확인함', 'done': '반영됨', 'wont': '보류'}
 

@@ -2,9 +2,11 @@
 // ---------- 동기화 (Supabase) ----------
 // 기록(운동·루틴·신체·직접 만든 운동·설정)을 레코드 단위로 서버 gymlog_recs 표와 맞춤 (아래 sync 설명 참고).
 // 로컬 변경 감지는 지난 동기화 때 레코드 해시(base)와 비교. SY.cur = 마지막으로 받은 서버 시각
-const SB_URL = 'https://kbotdssaktcsdbvqlwvq.supabase.co', SB_KEY = 'sb_publishable_u73Kts_nTertn0MowIiV1A_r3DG7WBY'; // 공개용 키 (RLS로 본인 행만 접근)
+const SB_URL = 'https://biixaxptjizezwethdsr.supabase.co', SB_KEY = 'sb_publishable_mqhk75nb2ezNo1-Be0e2_g_ZkkRlvV8'; // 공개용 키 (RLS로 본인 행만 접근)
 const SKEY = 'gymlog.sync';
 let SY = (() => { try { return JSON.parse(localStorage.getItem(SKEY)) || {}; } catch (e) { return {}; } })();
+// 서버를 옮기면(예전 supabase.co 주소가 저장된 기기) 새 주소로 바꾸고 로그인을 새로 받음. 기록은 기기에 남아 있다가 다시 로그인하면 전부 올라감
+if (/\.supabase\.co$/.test(SY.url || '') && SY.url !== SB_URL) Object.assign(SY, { url: SB_URL, key: SB_KEY, at: null, rt: null, exp: 0, cur: null, base: null, state: '서버를 옮겼어요. 다시 로그인해 주세요' });
 SY.url ||= SB_URL; SY.key ||= SB_KEY;
 const sySave = () => localStorage.setItem(SKEY, JSON.stringify(SY));
 const hash = s => { let h = 0; for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0; return h; };
