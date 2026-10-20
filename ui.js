@@ -83,7 +83,7 @@ const VIEWS = {
     const routines = [...S.routines].sort((x, y) => (y.used || 0) - (x.used || 0)).slice(0, 6);
     const hist = S.workouts.slice(0, ui.histN);
     const hm = ts => { const d = new Date(ts); return `${pad(d.getHours())}:${pad(d.getMinutes())}`; };
-    return `<div class="date">${now.getMonth() + 1}월 ${now.getDate()}일 ${DOW[now.getDay()]}요일</div><h1>운동</h1>
+    return `<div class="between"><div><div class="date">${now.getMonth() + 1}월 ${now.getDate()}일 ${DOW[now.getDay()]}요일</div><h1>운동</h1></div><button class="avbtn auto" data-a="sOpen:profile" aria-label="프로필">${avatar('md')}</button></div>
       ${levelCard()}
       <div class="card"><div class="between"><h3>이번 주</h3><span class="muted"><b class="num" style="font-size:20px;color:var(--text)">${week.filter(d => days.has(ymd(d))).length}</b>회 운동</span></div>
         <div class="week">${week.map(d => `<div class="${days.has(ymd(d)) ? 'w' : ''} ${ymd(d) === ymd(now) ? 'today' : ''}" ${days.has(ymd(d)) ? `data-a="calday:${ymd(d)}"` : ''}>${DOW[d.getDay()]}<b>${d.getDate()}</b></div>`).join('')}</div></div>
@@ -473,6 +473,7 @@ const A = {
   async notifyOn() { if (!window.Notification) return toast('이 브라우저는 알림 미지원 (아이폰은 홈 화면에 추가 후)'); await Notification.requestPermission(); render(); },
   testAlarm() { toast('5초 뒤 알림. 화면 꺼도 됨'); setTimeout(() => alarm(true), 5000); },
   async exportData() {
+    S.set.didBackup = true; save();
     await shareFile(new File([JSON.stringify(S)], `gymlog-${ymd(Date.now())}.json`, { type: 'application/json' }));
   },
   importData() { $('#importFile').click(); },
@@ -503,6 +504,7 @@ document.addEventListener('change', e => {
     S.set[k] = el.type === 'checkbox' ? el.checked : typeof DEF[k] === 'number' ? (el.value.trim() !== '' && isFinite(el.value) ? num(el.value) : DEF[k]) : el.value;
     save(); if (ui.tab === 'settings' && !ui.view) $('#app').innerHTML = VIEWS.settings(); // 뒤 목록 값만 갱신 (열린 시트 입력은 그대로)
   }
+  if (el.id === 'photoFile' && el.files[0]) setPhoto(el.files[0]);
   if (el.id === 'importFile' && el.files[0]) {
     el.files[0].text().then(t => {
       const x = JSON.parse(t);

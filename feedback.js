@@ -27,7 +27,7 @@ Object.assign(A, {
     if (!body) return toast('내용을 입력하세요');
     try {
       await api('gymlog_feedback', 'POST', { user_id: SY.uid, kind: m.kind, body: body.slice(0, 2000), app_ver: APP_VER, ua: navigator.userAgent.slice(0, 200) }, 'return=minimal');
-      m.draft = ''; m.mine = null; renderModal(); toast('보냈어요. 고마워요!'); loadFeedback();
+      S.set.didFeedback = true; save(); m.draft = ''; m.mine = null; renderModal(); toast('보냈어요. 고마워요!'); loadFeedback();
     } catch (e) { toast('보내기 실패: ' + e.message); }
   },
 });

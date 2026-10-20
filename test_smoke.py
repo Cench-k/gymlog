@@ -119,7 +119,19 @@ with sync_playwright() as pw:
     p.click('[data-a="tab:home"]'); assert 'Lv.' in p.inner_text('.lvcard')
     p.click('.lvcard'); assert '첫걸음' in p.inner_text('#modal .special:not(.off)') and '???' in p.inner_text('#modal')
     p.click('[data-a="bcat:근력"]'); assert '3대 합계' in p.inner_text('#modal') and '꾸준함' not in p.inner_text('#modal .tracks')
-    p.click('[data-a="bcat:특별"]'); p.click('[data-a="bpick:first"]'); assert p.evaluate('S.set.badge') == 'first'; shot(p, '8_level'); p.click('[data-a="close"]')
+    p.click('[data-a="bcat:특별"]'); p.click('[data-a="bpick:first"]'); assert p.evaluate('S.set.badge') == 'first'
+    assert p.evaluate("S.set.avatar") == 'badge' and p.locator('.avbtn .medal').count() == 1
+    p.click('[data-a="bcat:운동별"]'); assert '바벨 백 스쿼트' in p.inner_text('#modal .tracks')
+    assert p.evaluate("playerStats().total") > 1000 and p.evaluate("badgeInfo('x_바벨 백 스쿼트:2').name") == '바벨 백 스쿼트 실버'
+    p.click('[data-a="close"]')
+    # 프로필 사진 올리기 -> 160px로 줄여 저장
+    import base64, io
+    from PIL import Image
+    buf = io.BytesIO(); Image.new('RGB', (600, 400), (255, 106, 19)).save(buf, 'PNG')
+    p.click('[data-a="sOpen:profile"]'); p.set_input_files('#photoFile', files=[{'name': 'me.png', 'mimeType': 'image/png', 'buffer': buf.getvalue()}])
+    p.wait_for_function("S.set.avatar === 'photo'")
+    assert p.evaluate("S.set.photo.startsWith('data:image/jpeg')") and p.evaluate("S.set.photo.length") < 30000
+    assert p.locator('.avbtn img.avatar').count() == 1; shot(p, '8_level'); p.click('[data-a="close"]')
     p.click('[data-a="tab:stats"]')
     p.click('[data-a^="exd:"] >> nth=0'); assert '추정 1RM' in p.inner_text('#modal')
     # 운동 그림 + 근육 지도

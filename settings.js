@@ -48,7 +48,7 @@ const SETTINGS = () => {
     ['기타', [['weekStart', '캘린더 시작 요일', 'cal', s.weekStart ? '월요일' : '일요일'], ['backup', '백업 · 복원', 'box', `운동 ${S.workouts.length}회`]]],
   ];
 };
-VIEWS.settings = () => `<h1>설정</h1>${SETTINGS().map(([sec, rows]) => `<h2>${sec}</h2><div class="card slist">${rows.map(([k, t, icon, v, act]) =>
+VIEWS.settings = () => `<h1>설정</h1><button class="card profcard" data-a="sOpen:profile">${avatar('lg')}<div class="grow"><b>${esc(S.set.nick || '닉네임 정하기')}</b><div class="muted">Lv.${playerStats().L} · 프로필 편집</div></div><span class="chev">›</span></button>${SETTINGS().map(([sec, rows]) => `<h2>${sec}</h2><div class="card slist">${rows.map(([k, t, icon, v, act]) =>
   v === 'toggle' ? `<label class="srow"><span class="sic"><svg viewBox="0 0 24 24">${SI[icon]}</svg></span><span class="grow">${t}</span><span class="tg"><input type="checkbox" data-s="${k}" ${S.set[k] ? 'checked' : ''}></span></label>`
     : `<button class="srow" data-a="${act || 'sOpen:' + k}"><span class="sic"><svg viewBox="0 0 24 24">${SI[icon]}</svg></span><span class="grow">${t}</span><span class="muted sval">${v}</span><span class="chev">›</span></button>`).join('')}</div>`).join('')}
   <div class="sfoot">${SY.rt ? '<button class="ghost" data-a="logout">로그아웃</button>' : ''}<button class="ghost danger" data-a="resetAll">전체 초기화</button></div>
@@ -59,7 +59,7 @@ const fld = (label, k, o = {}) => `<label class="sw">${label}<input data-s="${k}
 const sel = (label, k, opts) => `<label class="sw">${label}<select data-s="${k}">${Object.entries(opts).map(([v, t]) => `<option value="${v}" ${String(S.set[k]) === v ? 'selected' : ''}>${t}</option>`).join('')}</select></label>`;
 const SHEETS = {
   account: ['계정 · 동기화', () => syncCard()],
-  profile: ['프로필', () => `<div class="card">${fld('닉네임 (프로그램 공유 때 표시)', 'nick', { mode: 'text', w: 130 })}${fld('키 (cm)', 'height')}</div><p class="muted small">키는 BMI·FFMI 계산에, 칼로리는 신체 탭의 최근 체중으로 계산해요.</p>`],
+  profile: ['프로필', () => `<div class="profedit">${avatar('lg')}<div class="row"><button data-a="photoPick">사진 올리기</button><button data-a="levelOpen">뱃지 고르기</button>${S.set.avatar ? '<button class="auto ghost" data-a="avatarOff">기본</button>' : ''}</div><input type="file" id="photoFile" accept="image/*" hidden></div><div class="card">${fld('닉네임 (프로그램 공유 때 표시)', 'nick', { mode: 'text', w: 130 })}${fld('키 (cm)', 'height')}</div><p class="muted small">키는 BMI·FFMI 계산에, 칼로리는 신체 탭의 최근 체중으로 계산해요.</p>`],
   template: ['세트 템플릿', () => `<div class="card">${fld('기본 세트 수', 'setN', { mode: 'numeric' })}${fld('기본 횟수', 'setR', { mode: 'numeric' })}</div><p class="muted small">처음 하는 운동을 추가할 때 이 세트로 시작해요. 해 본 운동은 지난번 세트를 불러와요.</p>`],
   plates: ['가지고 있는 원판', () => `<div class="card">${fld('바벨 무게 (kg)', 'bar')}${fld('원판 (kg, 쉼표로)', 'plates', { w: 170 })}</div><p class="muted small">원판 계산기와 웜업 세트 계산에 써요.</p>`],
   dbs: ['가지고 있는 덤벨', () => `<div class="card">${fld('덤벨 (kg, 쉼표로)', 'dbs', { w: 170, ph: '2,4,6,8,10,12.5' })}</div><p class="muted small">입력하면 덤벨 운동의 웜업·피라미드·드롭 세트 무게를 가진 덤벨 중 가장 가까운 무게로 맞춰요. 비우면 무게 변경 단위로 반올림해요.</p>`],
@@ -106,7 +106,17 @@ function ivTick() {
   const el = $('#ivBig'); if (el) el.textContent = hms(Math.ceil((IV.end - Date.now()) / 1000));
 }
 
+// 프로필 사진: 가운데를 정사각형으로 잘라 160px JPEG로 줄여 설정에 저장 (기기 간 동기화됨)
+async function setPhoto(file) {
+  try {
+    const img = await createImageBitmap(file), z = Math.min(img.width, img.height), c = Object.assign(document.createElement('canvas'), { width: 160, height: 160 });
+    c.getContext('2d').drawImage(img, (img.width - z) / 2, (img.height - z) / 2, z, z, 0, 0, 160, 160);
+    S.set.photo = c.toDataURL('image/jpeg', 0.82); S.set.avatar = 'photo'; save(); render(); toast('프로필 사진을 바꿨어요');
+  } catch (e) { toast('사진을 못 읽었어요: ' + e.message); }
+}
 Object.assign(A, {
+  photoPick() { $('#photoFile').click(); },
+  avatarOff() { S.set.avatar = ''; save(); render(); },
   sOpen(k) { ui.modal = { type: 'sset', k }; renderModal(); },
   rmIn() { const m = ui.modal; m.w = $('#rm_w').value; m.r = $('#rm_r').value; $('#rmOut').innerHTML = rmTable(m); },
   ivStart() {

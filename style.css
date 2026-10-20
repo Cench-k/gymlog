@@ -186,6 +186,16 @@ tr.done .chk{background:var(--pri);color:var(--on-pri)}
 .specials{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
 .special{background:var(--card2);border-radius:16px;padding:14px 6px 12px;text-align:center;display:flex;flex-direction:column;align-items:center;gap:6px;cursor:pointer}
 .special b{font-size:13px;line-height:1.25}.special span{font-size:11px;color:var(--muted);line-height:1.3}.special.off b{color:var(--muted)}
+.avatar{width:44px;height:44px;flex:0 0 auto;border-radius:50%;object-fit:cover;display:inline-flex;align-items:center;justify-content:center;overflow:hidden}
+.avatar.ph{background:var(--pri2);color:var(--pri-t);font-weight:800;font-size:18px}
+.avatar .medal{width:100%;height:100%;flex:none}.avatar .medal i{display:none}
+.avatar.md{width:46px;height:46px}.avatar.md .medal svg{width:22px;height:22px}
+.avatar.lg{width:64px;height:64px}.avatar.lg.ph{font-size:26px}.avatar.lg .medal svg{width:30px;height:30px}
+.profedit .avatar.lg{width:104px;height:104px;margin:6px auto 14px;display:flex}.profedit .avatar.lg .medal svg{width:46px;height:46px}.profedit .avatar.ph{font-size:40px}
+.profedit{text-align:center;margin-bottom:14px}
+.avbtn{background:none;padding:0;border-radius:50%;margin-top:14px}
+.profcard{display:flex;align-items:center;gap:14px;width:100%;text-align:left;font-weight:500;color:var(--text)}.profcard b{font-size:18px;display:block}
+.medal.xs{width:22px;height:22px;flex:0 0 22px;box-shadow:inset 0 0 0 2px var(--mc)}.medal.xs svg{width:12px;height:12px}.medal.xs i{display:none}
 .newb{background:var(--report);color:var(--on-report);border-radius:16px;padding:14px 16px;margin-bottom:12px}.newb>b{color:var(--pri)}
 .newbl{display:flex;flex-wrap:wrap;gap:10px 16px;margin-top:10px}.newbl div{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600}
 .lvup{background:var(--hero);color:var(--on-hero);border-radius:16px;padding:14px 16px;margin-bottom:12px;font-size:15px}.lvup b{color:var(--hero-hi)}

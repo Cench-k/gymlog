@@ -32,6 +32,7 @@ create policy "read all" on public.gymlog_programs for select to authenticated u
 drop policy if exists "own row" on public.gymlog_programs;
 create policy "own row" on public.gymlog_programs for all to authenticated
   using ((select auth.uid()) = user_id) with check ((select auth.uid()) = user_id);
+alter table public.gymlog_programs add column if not exists badge text not null default '' check (char_length(badge) <= 80);  -- 올린 사람 대표 뱃지
 grant select, insert, update, delete on public.gymlog_programs to authenticated;
 
 -- 가져감·별점: 사람당 프로그램마다 한 행이라 여러 번 가져가도 1명으로 셈.
@@ -57,7 +58,7 @@ grant select, insert, update on public.gymlog_program_votes to authenticated;
 -- 목록용: 가져간 사람 수와 평균 별점을 붙인 뷰 (조회하는 사람 권한으로 실행)
 create or replace view public.gymlog_programs_v with (security_invoker = true) as
   select p.id, p.user_id, p.author, p.name, p.descr, p.days, p.updated_at,
-    count(*) filter (where v.used) as uses, round(avg(v.rating), 1) as rating, count(v.rating) as ratings
+    count(*) filter (where v.used) as uses, round(avg(v.rating), 1) as rating, count(v.rating) as ratings, p.badge
   from public.gymlog_programs p left join public.gymlog_program_votes v on v.program_id = p.id
   group by p.id;
 grant select on public.gymlog_programs_v to authenticated;
