@@ -34,6 +34,7 @@
 |---|---|
 | data.js | 내장 운동 목록(부위별), 역도 종목 `OLYMPIC`, 기본 프로그램 `PROGRAMS` |
 | media.js | 운동 사진·애니메이션 id와 주동근/보조근 `MEDIA`, 근육 지도 폴리곤 `BODY` |
+| style.css | 전체 스타일. 색·글꼴은 맨 위 `:root` 변수만 바꾸면 전체 적용 (밝은 바탕 + 파란 포인트 `--pri`) |
 | core.js | 상수, 유틸, 상태 `S`(localStorage `gymlog.v1`), 운동 메타 `EX`(종류·주동근), 계산(1RM·볼륨), 휴식 타이머, 근육 지도, 차트, `APP_VER` |
 | ui.js | `render()`, 탭 화면, 운동 기록 화면, 팝업, 버튼 동작 `A`, 입력 이벤트 |
 | sync.js | Supabase 로그인(이메일·구글)과 기록 동기화 |

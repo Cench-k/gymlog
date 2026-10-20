@@ -2,7 +2,7 @@
 // 짐로그: 운동 기록 PWA. 상태 전부 localStorage 한 키에 JSON으로 저장.
 // ponytail: localStorage 약 5MB 한도(운동 기록 수년치는 충분), 넘치면 IndexedDB로 이전.
 
-const APP_VER = '2026.10.20.2'; // 배포할 때 올림. 의견 보내기에 같이 저장돼 어느 버전 문제인지 앎
+const APP_VER = '2026.10.20.3'; // 배포할 때 올림. 의견 보내기에 같이 저장돼 어느 버전 문제인지 앎
 const KEY = 'gymlog.v1';
 const DEF = { height: 175, rest: 90, vibrate: true, sound: true, wake: true, autoRoutine: 'same', rpe: false, nick: '', fav: [], setN: 3, setR: 10, dbs: '', stepB: 2.5, stepD: 2, stepM: 5, restW: 60, warmEx: true, weekStart: 1, ivWork: 20, ivRest: 10, ivRounds: 8, bar: 20, plates: '25,20,15,10,5,2.5,1.25' };
 const TYPES = { N: '일반', W: '웜업', D: '드롭', F: '실패', P: '피더', R: '레스트-퍼즈' };
@@ -203,8 +203,8 @@ function chart(pts, bar, unit = '') {
   const Y = v => T + (1 - (v - mn) / rg) * (H - T - Bt);
   let g = `<line x1="${L}" x2="${W - R}" y1="${Y(mx)}" y2="${Y(mx)}" style="stroke:var(--line)"/><line x1="${L}" x2="${W - R}" y1="${Y(mn)}" y2="${Y(mn)}" style="stroke:var(--line)"/>
     <text x="${L - 4}" y="${Y(mx) + 3}" text-anchor="end">${short(mx)}</text><text x="${L - 4}" y="${Y(mn) + 3}" text-anchor="end">${short(mn)}</text>`;
-  if (bar) { const bw = Math.max(2, (W - L - R) / n * 0.6); g += pts.map((p, i) => `<rect x="${X(i) - bw / 2}" y="${Y(p.v)}" width="${bw}" height="${Math.max(0, Y(mn) - Y(p.v))}" rx="2" style="fill:var(--ink)"><title>${p.l} ${f1(p.v)}${unit}</title></rect>`).join(''); }
-  else g += `<polyline points="${pts.map((p, i) => X(i) + ',' + Y(p.v)).join(' ')}" style="fill:none;stroke:var(--ink);stroke-width:2"/>` + pts.map((p, i) => `<circle cx="${X(i)}" cy="${Y(p.v)}" r="2.5" style="fill:var(--ink)"><title>${p.l} ${f1(p.v)}${unit}</title></circle>`).join('');
+  if (bar) { const bw = Math.max(2, (W - L - R) / n * 0.6); g += pts.map((p, i) => `<rect x="${X(i) - bw / 2}" y="${Y(p.v)}" width="${bw}" height="${Math.max(0, Y(mn) - Y(p.v))}" rx="2" style="fill:var(--pri)"><title>${p.l} ${f1(p.v)}${unit}</title></rect>`).join(''); }
+  else g += `<polyline points="${pts.map((p, i) => X(i) + ',' + Y(p.v)).join(' ')}" style="fill:none;stroke:var(--pri);stroke-width:2"/>` + pts.map((p, i) => `<circle cx="${X(i)}" cy="${Y(p.v)}" r="2.5" style="fill:var(--pri)"><title>${p.l} ${f1(p.v)}${unit}</title></circle>`).join('');
   const lab = bar && n <= 12 ? pts.map((p, i) => [i, p.l]) : [[0, pts[0].l], [n - 1, pts[n - 1].l]];
   g += lab.map(([i, l]) => `<text x="${X(i)}" y="${H - 6}" text-anchor="${bar || n < 2 ? 'middle' : i ? 'end' : 'start'}">${esc(l)}</text>`).join('');
   return `<svg class="chart" viewBox="0 0 ${W} ${H}">${g}</svg>`;
