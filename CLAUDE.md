@@ -67,6 +67,14 @@
 - 앱 안에서는 서비스 워커를 끈다 (app.js). `window.Capacitor?.isNativePlatform?.()`로 앱/웹 구분
 - 웹뷰 안 구글 로그인은 구글이 막는다 → 앱에서는 네이티브 로그인 플러그인 필요 (출시 전 작업)
 
+## 신고 · 탈퇴 (스토어 심사 필수)
+
+- 탈퇴: 설정 → 계정·동기화 → 계정 삭제. 서버 함수 `gymlog_delete_me`가 auth 사용자를 지우면 모든 표가 cascade로 같이 지워짐
+- 공유 프로그램 신고: `gymlog_reports`. 3명 신고 시 트리거가 `hidden = true` (목록에서 사라지고 올린 사람에게만 "신고로 숨겨짐"). `hidden`은 사용자가 못 바꿈 (컬럼 단위 update 권한)
+- 차단: 기기 설정 `S.set.blocked`(동기화됨)로 그 사람 프로그램을 목록에서 뺌
+- 올릴 때 이용 규칙 동의 + 금칙어(share.js `BAD`) 거부
+- 운영: `python feedback_admin.py reports` 로 신고 확인, `hide <id>` / `unhide <id>`
+
 ## 의견 반영 흐름
 
 사용자가 설정 → 의견 보내기로 쓴 글은 `gymlog_feedback` 표에 쌓인다 (앱 버전·기기 정보 포함). `status`(new·seen·done·wont)와 `reply`를 고치면 사용자의 "내 의견"에 그대로 보인다.

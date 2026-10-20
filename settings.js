@@ -23,6 +23,7 @@ const SI = { // 줄 아이콘 (24 viewBox 선)
   share: '<path d="M12 15V4M8 8l4-4 4 4M5 13v5a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-5"/>',
   cal: '<rect x="4" y="5" width="16" height="15" rx="3"/><path d="M4 10h16M9 3v4M15 3v4"/>',
   box: '<path d="M4 8l8-4 8 4v8l-8 4-8-4zM4 8l8 4 8-4M12 12v8"/>',
+  lock: '<rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/>',
 };
 const ROUTINE_UPD = { off: '끔', same: '해당 루틴만', all: '같은 운동 든 모든 루틴' };
 // [섹션, [[키, 이름, 아이콘, 오른쪽 값 또는 'toggle', 누르면 할 동작(기본 sOpen:키)]]]
@@ -44,7 +45,7 @@ const SETTINGS = () => {
     ]],
     ['휴식 알림', [['sound', '휴식 타이머 알림음', 'bell', 'toggle'], ['vibrate', '휴식 타이머 진동', 'wave', 'toggle'], ['notify', '워치 · 푸시 알림', 'watch', perm]]],
     ['편의', [['rm', '1RM 계산기', 'calc', ''], ['interval', '인터벌 타이머', 'loop', ''], ['plateCalc', '원판 계산기', 'plate', '', 'plateOpen']]],
-    ['소셜', [['myProgs', '내가 공유한 프로그램', 'share', '', 'myProgs']]],
+    ['소셜', [['myProgs', '내가 공유한 프로그램', 'share', '', 'myProgs'], ['blocked', '차단한 사용자', 'lock', `${S.set.blocked.length}명`]]],
     ['기타', [['weekStart', '캘린더 시작 요일', 'cal', s.weekStart ? '월요일' : '일요일'], ['backup', '백업 · 복원', 'box', `운동 ${S.workouts.length}회`]]],
   ];
 };
@@ -73,6 +74,11 @@ const SHEETS = {
     <div class="row"><button data-a="exportData">내보내기</button><button data-a="importData">가져오기</button></div>
     <input type="file" id="importFile" accept=".json,application/json" hidden>
     <p class="muted small">운동 ${S.workouts.length}회 · 루틴 ${S.routines.length}개 · ${f1((localStorage.getItem(KEY) || '').length / 1024)}KB</p>`],
+  blocked: ['차단한 사용자', () => S.set.blocked.length ? `<div class="list">${S.set.blocked.map(b => `<div class="between"><span>${esc(b.name)}</span><button class="auto" data-a="unblock:${esc(b.id)}">차단 해제</button></div>`).join('')}</div>` : '<p class="muted">차단한 사용자가 없어요. 공유 프로그램의 "신고·차단"에서 차단할 수 있어요.</p>'],
+  deleteAcct: ['계정 삭제 (탈퇴)', () => `<p>계정을 지우면 서버에 있는 <b>운동 기록, 루틴, 신체 기록, 공유한 프로그램, 별점, 보낸 의견</b>이 모두 지워지고 되돌릴 수 없어요.</p>
+    <label class="agree"><input type="checkbox" id="d_local" checked> 이 기기에 있는 기록도 지우기</label>
+    <input id="d_word" placeholder="확인을 위해 탈퇴 라고 입력" style="margin:10px 0">
+    <button class="wide" style="background:var(--bad);color:#fff" data-a="deleteMe">계정 삭제</button>`],
   rm: ['1RM 계산기', m => `<div class="row" style="margin:8px 0"><input inputmode="decimal" placeholder="무게 (kg)" data-in="rmIn" id="rm_w" value="${esc(m.w || '')}"><input inputmode="numeric" placeholder="횟수" data-in="rmIn" id="rm_r" value="${esc(m.r || '')}"></div><div id="rmOut">${rmTable(m)}</div>`],
   interval: ['인터벌 타이머', () => ivHTML()],
 };

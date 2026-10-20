@@ -3,6 +3,8 @@
   python feedback_admin.py              # 처리 안 한 의견 (접수·확인함)
   python feedback_admin.py all          # 전부
   python feedback_admin.py set 12 done "다음 버전에서 고쳤어요"   # 상태: new seen done wont
+  python feedback_admin.py reports      # 신고된 공유 프로그램 (3명 신고 시 자동 숨김)
+  python feedback_admin.py hide <프로그램 id>   /   unhide <프로그램 id>
 
 관리자 키는 저장소 밖 파일에만 둔다 (GitHub에 올라가면 안 됨):
   %USERPROFILE%\\.gymlog-admin.env  안에  SUPABASE_SECRET_KEY=sb_secret_...
@@ -58,9 +60,30 @@ def set_status(fid, status, reply):
     print(f'#{fid} → {STATUS[status]}' + (f' (답변: {reply})' if reply else '') if r else f'#{fid} 없음')
 
 
+REASON = {'spam': '스팸·광고', 'abuse': '욕설·비방', 'sexual': '음란', 'copyright': '저작권', 'etc': '기타'}
+
+
+def reports():
+    rs = call('rest/v1/gymlog_reports?select=program_id,reason,note,created_at&order=created_at.desc')
+    if not rs: return print('신고 없음')
+    ids = sorted({r['program_id'] for r in rs})
+    progs = {p['id']: p for p in call('rest/v1/gymlog_programs?select=id,name,author,hidden&id=in.(' + ','.join(ids) + ')')}
+    for pid in ids:
+        p, mine = progs.get(pid, {}), [r for r in rs if r['program_id'] == pid]
+        print(f"{pid} [{'숨김' if p.get('hidden') else '공개'}] {p.get('name', '(삭제됨)')} · {p.get('author', '')} · 신고 {len(mine)}건")
+        for r in mine: print(f"  - {REASON.get(r['reason'], r['reason'])} {r['created_at'][:10]} {r['note']}")
+
+
+def hide(pid, on):
+    r = call(f'rest/v1/gymlog_programs?id=eq.{pid}', 'PATCH', {'hidden': on})
+    print(f"{pid} → {'숨김' if on else '공개'}" if r else f'{pid} 없음')
+
+
 if __name__ == '__main__':
     sys.stdout.reconfigure(encoding='utf-8'); sys.stderr.reconfigure(encoding='utf-8')
     a = sys.argv[1:]
     if a[:1] == ['set'] and len(a) >= 3: set_status(a[1], a[2], ' '.join(a[3:]))
+    elif a == ['reports']: reports()
+    elif a[:1] in (['hide'], ['unhide']) and len(a) == 2: hide(a[1], a[0] == 'hide')
     elif a in ([], ['all']): show(a == ['all'])
     else: print(__doc__)

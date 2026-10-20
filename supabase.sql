@@ -71,7 +71,7 @@ create policy "own vote" on public.gymlog_program_votes for all to authenticated
   with check ((select auth.uid()) = user_id and not exists (select 1 from public.gymlog_programs p where p.id = program_id and p.user_id = (select auth.uid())));
 grant select, insert, update on public.gymlog_program_votes to authenticated;
 
--- 목록용: 가져간 사람 수와 평균 별점을 붙인 뷰 (조회하는 사람 권한으로 실행)
+-- 목록용: 가져간 사람 수와 평균 별점을 붙인 뷰 (조회하는 사람 권한으로 실행). 아래 '신고 · 숨김'에서 숨김 조건을 넣어 다시 정의함
 create or replace view public.gymlog_programs_v with (security_invoker = true) as
   select p.id, p.user_id, p.author, p.name, p.descr, p.days, p.updated_at,
     count(*) filter (where v.used) as uses, round(avg(v.rating), 1) as rating, count(v.rating) as ratings, p.badge, p.photo
@@ -99,3 +99,50 @@ create policy "own insert" on public.gymlog_feedback for insert to authenticated
 drop policy if exists "own read" on public.gymlog_feedback;
 create policy "own read" on public.gymlog_feedback for select to authenticated using ((select auth.uid()) = user_id);
 grant select, insert on public.gymlog_feedback to authenticated;
+
+-- ===== 탈퇴 =====
+-- 내 계정 삭제. auth.users에서 지우면 기록·공유 프로그램·별점·신고·의견이 전부 함께 지워짐 (on delete cascade)
+create or replace function public.gymlog_delete_me() returns void
+language sql security definer set search_path = '' as $$
+  delete from auth.users where id = (select auth.uid());
+$$;
+revoke execute on function public.gymlog_delete_me() from public, anon;
+grant execute on function public.gymlog_delete_me() to authenticated;
+
+-- ===== 신고 · 숨김 =====
+-- 3명이 신고하면 hidden = true (목록에서 사라짐, 올린 사람에게만 보임). hidden은 사용자가 못 바꾸고 관리자만 바꿈
+alter table public.gymlog_programs add column if not exists hidden boolean not null default false;
+revoke update on public.gymlog_programs from authenticated;
+grant update (user_id, author, badge, photo, name, descr, days, updated_at) on public.gymlog_programs to authenticated;
+create table if not exists public.gymlog_reports (
+  program_id uuid not null references public.gymlog_programs on delete cascade,
+  user_id uuid not null default auth.uid() references auth.users on delete cascade,
+  reason text not null check (reason in ('spam', 'abuse', 'sexual', 'copyright', 'etc')),
+  note text not null default '' check (char_length(note) <= 500),
+  created_at timestamptz not null default now(),
+  primary key (program_id, user_id)
+);
+alter table public.gymlog_reports enable row level security;
+drop policy if exists "own insert" on public.gymlog_reports;
+create policy "own insert" on public.gymlog_reports for insert to authenticated
+  with check ((select auth.uid()) = user_id and not exists (select 1 from public.gymlog_programs p where p.id = program_id and p.user_id = (select auth.uid())));
+drop policy if exists "own read" on public.gymlog_reports;
+create policy "own read" on public.gymlog_reports for select to authenticated using ((select auth.uid()) = user_id);
+grant select, insert on public.gymlog_reports to authenticated;
+create or replace function public.gymlog_report_hide() returns trigger
+language plpgsql security definer set search_path = '' as $$
+begin
+  update public.gymlog_programs set hidden = true
+  where id = new.program_id and (select count(*) from public.gymlog_reports where program_id = new.program_id) >= 3;
+  return new;
+end $$;
+drop trigger if exists gymlog_report_hide on public.gymlog_reports;
+create trigger gymlog_report_hide after insert on public.gymlog_reports for each row execute function public.gymlog_report_hide();
+-- 목록 뷰: 숨겨진 건 올린 사람만 봄
+create or replace view public.gymlog_programs_v with (security_invoker = true) as
+  select p.id, p.user_id, p.author, p.name, p.descr, p.days, p.updated_at,
+    count(*) filter (where v.used) as uses, round(avg(v.rating), 1) as rating, count(v.rating) as ratings, p.badge, p.photo, p.hidden
+  from public.gymlog_programs p left join public.gymlog_program_votes v on v.program_id = p.id
+  where not p.hidden or p.user_id = (select auth.uid())
+  group by p.id;
+grant select on public.gymlog_programs_v to authenticated;

@@ -35,7 +35,7 @@ function sharedReturn() {
 
 // 프로그램 공유: 루틴 폴더 하나 = 프로그램. Supabase gymlog_programs 표에 올리고 로그인한 누구나 가져감
 // ponytail: 최대 200개만 불러옴, 사용자 수백 명 넘으면 검색·페이지 나누기
-const PROG_COLS = 'id,user_id,author,badge,photo,name,descr,days,uses,rating,ratings';
+const PROG_COLS = 'id,user_id,author,badge,photo,hidden,name,descr,days,uses,rating,ratings';
 // 프로그램에 같이 올리는 프로필: 닉네임 + (사진 또는 대표 뱃지)
 const PHOTO_OK = /^data:image\/jpeg;base64,[A-Za-z0-9+/=]+$/;
 const myProfile = () => ({ author: (S.set.nick || (SY.email || '').split('@')[0] || '익명').slice(0, 30), badge: S.set.avatar === 'badge' ? S.set.badge.slice(0, 80) : '', photo: S.set.avatar === 'photo' && PHOTO_OK.test(S.set.photo || '') ? S.set.photo : '' });
@@ -77,17 +77,18 @@ function sharedList(m) {
 const progText = p => [p.name, p.author, p.descr, ...arr(p.days?.r).flatMap(r => [r?.n, ...arr(r?.i).map(it => it?.ex)])].map(x => str(x)).join(' ').replace(/\s/g, '').toLowerCase();
 function progItems(m) {
   const q = (m.q || '').replace(/\s/g, '').toLowerCase();
-  let list = m.mine ? m.list.filter(p => p.user_id === SY.uid) : m.list;
+  const blocked = new Set(S.set.blocked.map(b => b.id));
+  let list = m.mine ? m.list.filter(p => p.user_id === SY.uid) : m.list.filter(p => !blocked.has(p.user_id));
   if (q) list = list.filter(p => { const t = progText(p); return t.includes(q) || cho(t).includes(q); });
   if (!list.length) return `<p class="muted" style="text-align:center;padding:20px 0">${q ? '검색 결과가 없어요.' : ''}</p>`;
   return list.map(p => { const k = m.list.indexOf(p);
     const mine = p.user_id === SY.uid, days = arr(p.days?.r), my = m.my?.[p.id];
-    return `<div class="card prog" style="background:var(--card2)"><div class="progh">${progAvatar(p)}<div class="grow"><h3>${esc(str(p.name, 60))}</h3>
+    return `<div class="card prog" style="background:var(--card2)"><div class="progh">${progAvatar(p)}<div class="grow"><h3>${esc(str(p.name, 60))}${p.hidden ? ' <span class="tag bad">신고로 숨겨짐</span>' : ''}</h3>
       <div class="muted">${p.ratings ? `<b class="gold">★ ${num(p.rating).toFixed(1)}</b> (${num(p.ratings)}) · ` : ''}${esc(str(p.author, 30))}${mine ? ' (나)' : ''} · ${days.length}일 루틴</div></div><span class="muted small auto">${num(p.uses)}명 가져감</span></div>
       ${p.descr ? `<div style="margin:6px 0;white-space:pre-wrap">${esc(str(p.descr, 500))}</div>` : ''}
       <div class="muted small">${days.map(r => esc(str(r?.n, 60))).join(' / ')}</div>
       ${my?.used && !mine ? `<div class="between" style="margin-top:8px"><span class="muted small">내 별점</span><div class="stars">${stars(my.rating, k)}</div></div>` : ''}
-      <div class="row" style="margin-top:10px"><button class="pri" data-a="sharedAdd:${k}">${my?.used ? '다시 가져오기' : '가져오기'}</button>${mine ? '<button class="danger auto" data-a="pubDel:' + k + '">공유 중단</button>' : ''}</div></div>`;
+      <div class="row" style="margin-top:10px"><button class="pri" data-a="sharedAdd:${k}">${my?.used ? '다시 가져오기' : '가져오기'}</button>${mine ? '<button class="danger auto" data-a="pubDel:' + k + '">공유 중단</button>' : '<button class="ghost auto" data-a="reportOpen:' + k + '">신고·차단</button>'}</div></div>`;
   }).join('');
 }
 Object.assign(A, {
@@ -126,6 +127,8 @@ Object.assign(A, {
     const f = ui.modal.f, name = $('#p_name').value.trim(), descr = $('#p_desc').value.trim(), nick = $('#p_nick').value.trim();
     if (!name) return toast('프로그램 이름을 입력하세요');
     if (!nick) return toast('표시할 이름을 입력하세요');
+    if (!$('#p_agree').checked) return toast('이용 규칙에 동의해 주세요');
+    if (badWord([name, descr, nick, ...S.routines.filter(r => (r.folder || '기본') === f).map(r => r.name)].join(' '))) return toast('부적절한 표현이 있어 올릴 수 없어요');
     const rs = S.routines.filter(r => (r.folder || '기본') === f);
     S.set.nick = nick; save();
     try {
@@ -142,6 +145,40 @@ MODALS.pub = m => {
     <textarea id="p_desc" placeholder="설명: 누구에게 맞는지, 주 몇 회, 무게 올리는 법" maxlength="500" rows="3" style="margin-bottom:6px"></textarea>
     <input id="p_nick" value="${esc(S.set.nick || (SY.email || '').split('@')[0])}" placeholder="표시할 이름" maxlength="30">
     <p class="muted small">포함 루틴 ${rs.length}개: ${rs.map(r => esc(r.name)).join(' / ')}</p>
+    <label class="agree"><input type="checkbox" id="p_agree"> 비방·욕설·음란·광고·남의 저작물을 올리지 않을게요. 어기면 신고로 숨겨지거나 지워질 수 있어요.</label>
     <button class="pri wide" data-a="pubSave">공유하기</button>`;
 };
 
+// ---------- 신고 · 차단 (앱스토어 사용자 콘텐츠 규칙) ----------
+// ponytail: 금칙어는 짧은 목록으로만 거름, 우회가 많아지면 서버 쪽 필터나 관리자 검토 강화
+const BAD = ['시발', '씨발', 'ㅅㅂ', '병신', 'ㅂㅅ', '좆', '개새', '니미', '섹스', '야동', '포르노', 'porn', 'fuck', 'shit', '카지노', '토토', '도박', '불법'];
+const badWord = t => { const s = t.replace(/\s/g, '').toLowerCase(); return BAD.some(w => s.includes(w)); };
+const REASONS = { spam: '스팸·광고', abuse: '욕설·비방', sexual: '음란·선정성', copyright: '저작권 침해', etc: '기타' };
+MODALS.report = m => {
+  const p = ui.pmodal.list[m.k];
+  return `<div class="between"><h3>신고·차단</h3>${closeBtn}</div>
+    <p class="muted">"${esc(str(p.name, 60))}" (${esc(str(p.author, 30))})</p>
+    <div class="chips" style="margin:10px 0">${Object.entries(REASONS).map(([k, t]) => `<button class="chip ${m.reason === k ? 'on' : ''}" data-a="reportReason:${k}">${t}</button>`).join('')}</div>
+    <textarea id="r_note" rows="3" maxlength="500" placeholder="자세한 내용 (선택)"></textarea>
+    <button class="pri wide" style="margin-top:8px" data-a="reportSend">신고하기</button>
+    <p class="muted small">여러 명이 신고하면 바로 숨겨지고, 운영자가 확인해요.</p>
+    <button class="wide ghost danger" data-a="blockUser">이 사용자 차단 (이 사람의 프로그램이 안 보여요)</button>`;
+};
+Object.assign(A, {
+  reportOpen(k) { ui.pmodal = ui.modal; ui.modal = { type: 'report', k: +k, reason: 'spam' }; renderModal(); },
+  reportReason(r) { ui.modal.reason = r; const note = $('#r_note').value; renderModal(); $('#r_note').value = note; },
+  async reportSend() {
+    const m = ui.modal, p = ui.pmodal.list[m.k];
+    try {
+      await api('gymlog_reports?on_conflict=program_id,user_id', 'POST', { program_id: p.id, user_id: SY.uid, reason: m.reason, note: $('#r_note').value.trim().slice(0, 500) }, 'resolution=ignore-duplicates,return=minimal');
+      toast('신고했어요. 확인할게요'); ui.modal = ui.pmodal; renderModal(); loadShared();
+    } catch (e) { toast('신고 실패: ' + e.message); }
+  },
+  blockUser() {
+    const p = ui.pmodal.list[ui.modal.k];
+    if (!confirm(`${str(p.author, 30)} 님을 차단할까요? 이 사람이 올린 프로그램이 안 보여요. 설정 → 차단한 사용자에서 풀 수 있어요.`)) return;
+    S.set.blocked = [...S.set.blocked.filter(b => b.id !== p.user_id), { id: str(p.user_id, 60), name: str(p.author, 30) }]; save();
+    toast('차단했어요'); ui.modal = ui.pmodal; renderModal();
+  },
+  unblock(id) { S.set.blocked = S.set.blocked.filter(b => b.id !== id); save(); renderModal(); },
+});

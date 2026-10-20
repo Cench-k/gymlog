@@ -109,6 +109,15 @@ Object.assign(A, {
     if (!SY.url || !SY.key) return toast('Supabase URL·키를 입력하세요');
     sySave(); location.href = `${SY.url}/auth/v1/authorize?provider=google&redirect_to=${encodeURIComponent(location.origin + location.pathname)}`;
   },
+  async deleteMe() {
+    if ($('#d_word').value.trim() !== '탈퇴') return toast('탈퇴 라고 입력해 주세요');
+    const wipe = $('#d_local').checked;
+    try { await api('rpc/gymlog_delete_me', 'POST', {}); }
+    catch (e) { return toast('삭제 실패: ' + e.message); }
+    Object.assign(SY, { at: null, rt: null, exp: 0, base: null, last: 0, cur: null, uid: null, email: null }); sySave();
+    if (wipe) S = blank();
+    save(); indexEx(); ui.modal = null; render(); toast('계정을 삭제했어요');
+  },
   async syncNow() { await sync(true); render(); toast(SY.state || '동기화 완료'); },
 });
 async function afterLogin(j) {
@@ -129,7 +138,7 @@ async function oauthReturn() {
 }
 function syncCard() {
   if (SY.rt) return `<div class="card"><h3>동기화</h3><p class="muted">${esc(SY.email)} 로그인됨 · 기록이 자동으로 서버에 백업되고 다른 기기와 합쳐져요.</p>
-    <p class="muted small" id="syncState">${esc(syncLine())}</p><div class="row"><button data-a="syncNow">지금 동기화</button><button data-a="logout">로그아웃</button></div></div>`;
+    <p class="muted small" id="syncState">${esc(syncLine())}</p><div class="row"><button data-a="syncNow">지금 동기화</button><button data-a="logout">로그아웃</button></div><button class="ghost danger" style="margin-top:8px" data-a="sOpen:deleteAcct">계정 삭제 (탈퇴)</button></div>`;
   return `<div class="card"><h3>동기화</h3><p class="muted">로그인하면 기록이 서버에 백업되고 폰·태블릿·PC에서 같이 보여요. 오프라인이면 나중에 자동으로 올라가요.</p>
     <button class="wide gbtn" data-a="google">Google로 계속하기</button>
     <p class="muted small" style="text-align:center;margin:0 0 8px">또는 이메일</p>

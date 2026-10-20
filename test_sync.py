@@ -14,6 +14,7 @@ def server_recs(uid): return {k: r for (u, k), r in RECS.items() if u == uid and
 PROGS = []  # 공유 프로그램 표
 VOTES = {}  # (program_id, user_id) -> {used, rating}
 FB = []  # 의견
+REPORTS = {}  # (program_id, user_id) -> reason
 
 class H(http.server.SimpleHTTPRequestHandler):
     def __init__(s, *a, **k): super().__init__(*a, directory=ROOT, **k)
@@ -41,13 +42,27 @@ class H(http.server.SimpleHTTPRequestHandler):
         if u.path == '/rest/v1/gymlog_programs':
             old = next((x for x in PROGS if x['user_id'] == b['user_id'] and x['name'] == b['name']), None)
             if old: old.update(b)
-            else: PROGS.append({'id': 'p%d' % len(PROGS), **b})
+            else: PROGS.append({'id': 'p%d' % len(PROGS), 'hidden': False, **b})
             return s.send(201)
         if u.path == '/rest/v1/gymlog_program_votes':
             v = VOTES.setdefault((b['program_id'], b['user_id']), {'used': False, 'rating': None})
             new = {**v, **{k: b[k] for k in ('used', 'rating') if k in b}}
             if new['rating'] is not None and not new['used']: return s.send(400, {'message': 'check violation'})
             v.update(new); return s.send(201)
+        if u.path == '/rest/v1/gymlog_reports':  # 자기 프로그램은 신고 불가, 3명이면 숨김
+            pr = next(x for x in PROGS if x['id'] == b['program_id'])
+            if pr['user_id'] == b['user_id']: return s.send(403, {'message': 'own program'})
+            REPORTS.setdefault((b['program_id'], b['user_id']), b['reason'])
+            if sum(1 for (pid, _) in REPORTS if pid == pr['id']) >= 3: pr['hidden'] = True
+            return s.send(201)
+        if u.path == '/rest/v1/rpc/gymlog_delete_me':  # 계정과 딸린 데이터 전부 삭제
+            me = s.uid()
+            for key in [k for k in RECS if k[0] == me]: del RECS[key]
+            PROGS[:] = [x for x in PROGS if x['user_id'] != me]
+            for d in (VOTES, REPORTS):
+                for key in [k for k in d if k[1] == me]: del d[key]
+            FB[:] = [f for f in FB if f['user_id'] != me]
+            return s.send(204)
         if u.path == '/rest/v1/gymlog_feedback':
             FB.append({'id': len(FB) + 1, 'status': 'new', 'reply': '', 'created_at': '2026-10-20T00:00:00Z', **b}); return s.send(201)
         s.send(404, {'message': 'unknown'})
@@ -66,6 +81,7 @@ class H(http.server.SimpleHTTPRequestHandler):
         if s.path.startswith('/rest/v1/gymlog_programs_v'):
             out = []
             for x in PROGS:
+                if x.get('hidden') and x['user_id'] != s.uid(): continue  # 숨긴 건 올린 사람만
                 vs = [v for (pid, _), v in VOTES.items() if pid == x['id']]
                 rs = [v['rating'] for v in vs if v['rating']]
                 out.append({**x, 'uses': sum(v['used'] for v in vs), 'rating': round(sum(rs) / len(rs), 1) if rs else None, 'ratings': len(rs)})
@@ -187,10 +203,14 @@ with sync_playwright() as pw:
     Bd.click('[data-a="tab:routines"]'); Bd.click('[data-a="progs"]'); Bd.click('[data-a="progAdd:1"]')
     Bd.click('[data-a="pubOpen:StrongLifts%205x5"]')
     assert Bd.input_value('#p_name') == 'StrongLifts 5x5' and Bd.input_value('#p_nick') == 'me'
+    Bd.fill('#p_desc', '<b>초보</b> 주 3회'); Bd.click('[data-a="pubSave"]'); Bd.wait_for_timeout(200)
+    assert len(PROGS) == 0 and '동의' in Bd.inner_text('#toast')  # 이용 규칙 동의 전엔 못 올림
+    Bd.check('#p_agree'); Bd.fill('#p_desc', '토토 사이트 홍보'); Bd.click('[data-a="pubSave"]'); Bd.wait_for_timeout(200)
+    assert len(PROGS) == 0 and '부적절' in Bd.inner_text('#toast')  # 금칙어
     Bd.fill('#p_desc', '<b>초보</b> 주 3회'); Bd.click('[data-a="pubSave"]'); Bd.wait_for_function('!ui.modal')
     assert len(PROGS) == 1 and len(PROGS[0]['days']['r']) == 2 and PROGS[0]['author'] == 'me'
     Bd.click('[data-a="pubOpen:StrongLifts%205x5"]'); Bd.wait_for_function("document.querySelector('#p_desc').value")  # 기존 설명 채워짐
-    Bd.click('[data-a="pubSave"]'); Bd.wait_for_function('!ui.modal')
+    Bd.check('#p_agree'); Bd.click('[data-a="pubSave"]'); Bd.wait_for_function('!ui.modal')
     assert len(PROGS) == 1  # 같은 이름은 덮어씀
     # 프로필 사진을 바꾸면 이미 공유한 프로그램에도 반영, 남이 보는 목록에 사진이 뜸
     Bd.evaluate("S.set.photo='data:image/jpeg;base64,/9j/AAAA'; S.set.avatar='photo'; save(); profSync()"); Bd.wait_for_timeout(300)
@@ -226,7 +246,26 @@ with sync_playwright() as pw:
     F.wait_for_function("document.querySelector('#modal').innerText.includes('고쳤어요')")
     assert '반영됨' in F.inner_text('#modal') and F.locator('#modal i').count() == 0
     F.click('[data-a="close"]')
+    # 차단: F가 올린 사람(me)을 차단 -> 목록에서 사라짐, 설정에서 해제
+    F.click('[data-a="tab:routines"]'); F.click('[data-a="progs"]'); F.click('[data-a="progTab:shared"]'); F.click('[data-a="reportOpen:0"]'); F.click('[data-a="blockUser"]')
+    assert F.locator('#proglist .prog').count() == 0 and F.evaluate('S.set.blocked[0].name') == 'me'
+    F.click('[data-a="close"]'); F.click('[data-a="tab:settings"]'); F.click('[data-a="sOpen:blocked"]'); F.click('[data-a^="unblock:"]')
+    assert F.evaluate('S.set.blocked.length') == 0; F.click('[data-a="close"]')
+    # 신고: F가 신고 -> 다른 두 명도 신고해 3명이 되면 숨김. 올린 사람에겐 '신고로 숨겨짐'
+    F.click('[data-a="tab:routines"]'); F.click('[data-a="progs"]'); F.click('[data-a="progTab:shared"]'); F.click('[data-a="reportOpen:0"]')
+    F.click('[data-a="reportReason:abuse"]'); F.fill('#r_note', '욕설'); F.click('[data-a="reportSend"]'); F.wait_for_timeout(300)
+    assert REPORTS == {('p0', 'u-f@x.com'): 'abuse'} and not PROGS[0]['hidden']
+    REPORTS[('p0', 'u-x')] = 'spam'; REPORTS[('p0', 'u-y')] = 'spam'; PROGS[0]['hidden'] = True
+    F.click('[data-a="progTab:shared"]'); F.wait_for_timeout(300); assert F.locator('#proglist .prog').count() == 0
+    F.click('[data-a="close"]')
+    # 탈퇴: '탈퇴' 입력해야 진행, 서버의 내 기록·신고 삭제, 이 기기도 비움
+    workout(F, 'F1', 50); sync(F); assert len(server_recs('u-f@x.com')) >= 2
+    F.click('[data-a="tab:settings"]'); F.click('[data-a="sOpen:account"]'); F.click('[data-a="sOpen:deleteAcct"]')
+    F.click('[data-a="deleteMe"]'); F.wait_for_timeout(200); assert F.evaluate('!!SY.rt')  # 입력 안 하면 안 지움
+    F.fill('#d_word', '탈퇴'); F.click('[data-a="deleteMe"]'); F.wait_for_function('!SY.rt')
+    assert server_recs('u-f@x.com') == {} and ('p0', 'u-f@x.com') not in REPORTS and F.evaluate('S.workouts.length') == 0
     Bd.click('[data-a="progs"]'); Bd.click('[data-a="progTab:shared"]'); Bd.wait_for_selector('[data-a="pubDel:0"]')
+    assert '신고로 숨겨짐' in Bd.inner_text('#modal')
     Bd.click('[data-a="pubDel:0"]'); Bd.wait_for_function("document.querySelector('#modal').innerText.includes('아직 공유된')")
     assert PROGS == []
     assert not F.errors, F.errors
