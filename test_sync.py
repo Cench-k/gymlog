@@ -1,15 +1,19 @@
 """동기화 테스트: 가짜 Supabase(auth + rest) 서버 + 두 기기(브라우저 컨텍스트). python test_sync.py"""
 import http.server, threading, json, os, re
+from datetime import datetime, timedelta, timezone
 from urllib.parse import urlparse, parse_qs
 from playwright.sync_api import sync_playwright
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
-ROWS = {}  # user_id -> {data, rev}
+RECS = {}  # (user_id, k) -> {k, v, u, at}  기록 표 gymlog_recs
 LOCK = threading.Lock()
-RACE = {'on': False, 'patches': 0}
+CLOCK = [0]
+def tick():  # 서버 시각: 부를 때마다 1ms씩 증가
+    CLOCK[0] += 1; return (datetime(2026, 10, 20, tzinfo=timezone.utc) + timedelta(milliseconds=CLOCK[0])).isoformat()
+def server_recs(uid): return {k: r for (u, k), r in RECS.items() if u == uid and r['v'] is not None}
 PROGS = []  # 공유 프로그램 표
 VOTES = {}  # (program_id, user_id) -> {used, rating}
-FB = []  # 의견  # on: GET 직후 다른 기기가 올린 것처럼 rev 올림
+FB = []  # 의견
 
 class H(http.server.SimpleHTTPRequestHandler):
     def __init__(s, *a, **k): super().__init__(*a, directory=ROOT, **k)
@@ -18,13 +22,22 @@ class H(http.server.SimpleHTTPRequestHandler):
         b = json.dumps(obj).encode() if obj is not None else b''
         s.send_response(code); s.send_header('Content-Type', 'application/json'); s.end_headers(); s.wfile.write(b)
     def body(s): return json.loads(s.rfile.read(int(s.headers.get('Content-Length') or 0)) or b'{}')
+    def uid(s):  # 토큰 't:<user id>', 구글 테스트 토큰 'gtok'
+        t = (s.headers.get('Authorization') or '').replace('Bearer ', '')
+        return 'u-g@x.com' if t == 'gtok' else t[2:]
     def q(s): return {k: v[0].split('.', 1)[-1] for k, v in parse_qs(urlparse(s.path).query).items() if k != 'select' and k != 'grant_type'}
     def do_POST(s):
         u, b = urlparse(s.path), s.body()
         if u.path.startswith('/auth/v1/'):
             email = b.get('email', 'a@x.com')
             if b.get('password') == 'wrong': return s.send(400, {'msg': 'Invalid login credentials'})
-            return s.send(200, {'access_token': 't', 'refresh_token': 'r', 'expires_in': 3600, 'user': {'id': 'u-' + email, 'email': email}})
+            return s.send(200, {'access_token': 't:u-' + email, 'refresh_token': 'r', 'expires_in': 3600, 'user': {'id': 'u-' + email, 'email': email}})
+        if u.path == '/rest/v1/rpc/gymlog_push':  # 서버보다 새 것(u가 큰 것)만 씀
+            with LOCK:
+                for r in b['rows']:
+                    cur = RECS.get((s.uid(), r['k']))
+                    if not cur or cur['u'] < r['u']: RECS[(s.uid(), r['k'])] = {'k': r['k'], 'v': r['v'], 'u': r['u'], 'at': tick()}
+            return s.send(204)
         if u.path == '/rest/v1/gymlog_programs':
             old = next((x for x in PROGS if x['user_id'] == b['user_id'] and x['name'] == b['name']), None)
             if old: old.update(b)
@@ -37,21 +50,14 @@ class H(http.server.SimpleHTTPRequestHandler):
             v.update(new); return s.send(201)
         if u.path == '/rest/v1/gymlog_feedback':
             FB.append({'id': len(FB) + 1, 'status': 'new', 'reply': '', 'created_at': '2026-10-20T00:00:00Z', **b}); return s.send(201)
-        with LOCK:
-            if b['user_id'] in ROWS: return s.send(409, {'message': 'duplicate'})
-            ROWS[b['user_id']] = {'data': b['data'], 'rev': b['rev']}
-        s.send(201)
+        s.send(404, {'message': 'unknown'})
     def do_PATCH(s):
         q, b = s.q(), s.body()
         if s.path.startswith('/rest/v1/gymlog_programs'):
             for x in PROGS:
                 if x['user_id'] == q['user_id']: x.update(b)
             return s.send(204)
-        with LOCK:
-            row = ROWS.get(q['user_id'])
-            if not row or row['rev'] != int(q['rev']): return s.send(200, [])
-            RACE['patches'] += 1; row.update(data=b['data'], rev=b['rev'])
-            s.send(200, [row])
+        s.send(404, {'message': 'unknown'})
     def do_DELETE(s):
         pid = s.q()['id']; PROGS[:] = [x for x in PROGS if x['id'] != pid]; s.send(204)
     def do_GET(s):
@@ -72,11 +78,12 @@ class H(http.server.SimpleHTTPRequestHandler):
         if s.path.startswith('/rest/v1/gymlog_feedback'):
             me = s.q()['user_id']
             return s.send(200, [f for f in FB if f['user_id'] == me][::-1])
-        if s.path.startswith('/rest/v1/'):
-            row = ROWS.get(s.q()['user_id'])
-            s.send(200, [row] if row else [])
-            if row and RACE['on']: RACE['on'] = False; row['data']['recs']['w:other'] = {'id': 'other', 'name': 'C1', 'start': 1, 'end': 2, 'items': []}; row['rev'] += 1
-            return
+        if s.path.startswith('/rest/v1/gymlog_recs'):
+            q = s.q(); since = datetime.fromisoformat(q['updated_at'].replace('Z', '+00:00'))
+            with LOCK:
+                rows = sorted((r for (u, k), r in RECS.items() if u == s.uid() and datetime.fromisoformat(r['at']) > since), key=lambda r: (r['at'], r['k']))
+            off, lim = int(q.get('offset', 0)), int(q.get('limit', 1000))
+            return s.send(200, rows[off:off + lim])
         super().do_GET()
 
 srv = http.server.ThreadingHTTPServer(('127.0.0.1', 0), H)
@@ -113,7 +120,7 @@ with sync_playwright() as pw:
     workout(A, 'A1', 60); workout(A, 'A2', 70)
     A.evaluate("S.set.height=180; save()")
     login(A); A.wait_for_function('SY.last > 0')
-    assert len(ROWS['u-me@x.com']['data']['recs']) == 3
+    assert len(server_recs('u-me@x.com')) == 3  # 운동 2 + 설정
 
     # B: 새 기기 로그인 -> A 기록과 설정을 받음 (B의 기본 설정이 서버를 덮으면 안 됨)
     login(Bd); Bd.wait_for_function('SY.last > 0')
@@ -134,23 +141,32 @@ with sync_playwright() as pw:
     Bd.evaluate("S.workouts[0].name='B쪽 수정'; save()"); sync(Bd); sync(A)
     assert A.evaluate('S.workouts[0].name') == 'B쪽 수정'
 
-    # 동시 업로드 (rev 충돌) -> 둘 다 살아남음
+    # 양쪽이 따로 추가 -> 둘 다 살아남음, 바뀐 것만 오감
     workout(A, 'A3', 80); workout(Bd, 'B1', 90)
-    sync(A)
-    RACE['on'] = True; sync(Bd)  # B가 받은 직후 제3기기가 C1을 올림 -> B의 PATCH 실패 -> 재시도
-    assert not RACE['on']
-    workout(A, 'A4', 85); sync(A); sync(Bd)
+    sync(A); sync(Bd)
+    n0 = CLOCK[0]; workout(A, 'A4', 85); sync(A)
+    assert CLOCK[0] - n0 == 1  # 새 기록 하나만 올라감 (전체 문서 아님)
+    sync(Bd)
     names = sorted(Bd.evaluate('S.workouts.map(w=>w.name)'))
-    assert names == sorted(['B쪽 수정', 'A3', 'B1', 'A4', 'C1']), names
+    assert names == sorted(['B쪽 수정', 'A3', 'B1', 'A4']), names
+    # 예전 수정 시각으로 올리면 서버의 새 기록을 못 덮음
+    k = next(k for k, r in server_recs('u-me@x.com').items() if k.startswith('w:') and r['v']['name'] == 'A4')
+    A.evaluate(f"api('rpc/gymlog_push','POST',{{rows:[{{k:'{k}',v:{{id:'x',name:'옛날',start:1,end:2,items:[]}},u:1}}]}})"); A.wait_for_timeout(200)
+    assert server_recs('u-me@x.com')[k]['v']['name'] == 'A4'
+    # 서버를 옮긴 것처럼 커서가 없어진 기기 -> 가진 기록 전부 다시 올림, 중복 안 생김
+    RECS.clear(); A.evaluate('SY.cur=null; save()'); sync(A)
+    assert len([k for k in server_recs('u-me@x.com') if k.startswith('w:')]) == 4
+    Bd.evaluate('SY.cur=null'); sync(Bd)
+    assert sorted(Bd.evaluate('S.workouts.map(w=>w.name)')) == names
 
     # 초기화는 서버를 지우지 않음
     A.evaluate('A.close()'); A.click('[data-a="tab:settings"]'); A.click('[data-a="resetAll"]')
     assert A.evaluate('S.workouts.length') == 0
-    assert len([k for k in ROWS['u-me@x.com']['data']['recs'] if k.startswith('w:')]) == 5
+    assert len([k for k in server_recs('u-me@x.com') if k.startswith('w:')]) == 4
 
     # 진행 중인 운동은 동기화 대상 아님 (기기별)
     Bd.evaluate("A.start('')"); sync(Bd)
-    assert 'active' not in json.dumps(ROWS['u-me@x.com']['data']['recs'].keys().__repr__())
+    assert not any('active' in k for k in server_recs('u-me@x.com'))
 
     # 구글 로그인: 버튼 -> authorize 주소, 돌아오면 #토큰으로 로그인
     G = device(b)
@@ -188,7 +204,7 @@ with sync_playwright() as pw:
     F.fill('[data-in="progQ"]', 'ㅂㅂㅅㅋㅌ'); assert F.locator('#proglist .prog').count() == 1
     F.fill('[data-in="progQ"]', 'me'); assert F.locator('#proglist .prog').count() == 1
     F.fill('[data-in="progQ"]', '없는프로그램'); assert F.locator('#proglist .prog').count() == 0 and '검색 결과가 없어요' in F.inner_text('#proglist')
-    F.fill('[data-in="progQ"]', ''), F.inner_text('#modal')
+    F.fill('[data-in="progQ"]', '')
     assert F.locator('[data-a^="rate:"]').count() == 0  # 가져가기 전엔 별점 없음
     F.click('[data-a="sharedAdd:0"]')
     assert F.evaluate("S.routines.filter(r=>r.folder==='StrongLifts 5x5').length") == 2

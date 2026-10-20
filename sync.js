@@ -1,8 +1,7 @@
 'use strict';
 // ---------- 동기화 (Supabase) ----------
-// 유저당 한 행(jsonb)에 레코드 맵 저장. 레코드별 수정시각 u로 병합, 삭제는 묘비(del).
-// 로컬 변경 감지는 지난 동기화 때 레코드 해시(base)와 비교. 업로드는 rev 낙관적 잠금.
-// ponytail: 매번 전체 문서 업로드, 기록이 수 MB 넘으면 레코드별 행으로 분리
+// 기록(운동·루틴·신체·직접 만든 운동·설정)을 레코드 단위로 서버 gymlog_recs 표와 맞춤 (아래 sync 설명 참고).
+// 로컬 변경 감지는 지난 동기화 때 레코드 해시(base)와 비교. SY.cur = 마지막으로 받은 서버 시각
 const SB_URL = 'https://kbotdssaktcsdbvqlwvq.supabase.co', SB_KEY = 'sb_publishable_u73Kts_nTertn0MowIiV1A_r3DG7WBY'; // 공개용 키 (RLS로 본인 행만 접근)
 const SKEY = 'gymlog.sync';
 let SY = (() => { try { return JSON.parse(localStorage.getItem(SKEY)) || {}; } catch (e) { return {}; } })();
@@ -45,40 +44,45 @@ async function api(path, method = 'GET', body, prefer) {
 }
 let syncing = false, syncT;
 function scheduleSync() { if (SY.rt) { clearTimeout(syncT); syncT = setTimeout(sync, 4000); } }
+// 레코드 단위 동기화: 기록 하나 = 서버 gymlog_recs 한 행. 바뀐 것만 올리고, 지난번 이후 바뀐 것만 받음.
+// 충돌은 레코드별 수정 시각 u가 큰 쪽이 이김 (서버 함수 gymlog_push가 비교해서 더 새 것만 씀). 삭제는 v=null.
+// 처음 동기화하는 기기는 가진 기록을 전부 올림 (서버에 더 새 것이 있으면 서버가 이김) → 서버를 옮겨도 기기에서 복구됨
+const PULL_OVERLAP = 120e3; // 커밋 순서가 뒤바뀌어도 놓치지 않게 지난 커서보다 2분 앞부터 다시 받음
 async function sync(force) {
   if (!SY.rt || syncing) return;
   syncing = true; SY.state = '동기화 중…';
   try {
-    for (let tries = 0; tries < 4; tries++) {
-      const now = Date.now(), loc = recs(), first = !SY.base, base = SY.base || {}, del = {};
-      let dirty = false;
-      if (!first) {
-        for (const [k, v] of Object.entries(loc)) if (base[k] !== hash(JSON.stringify(v))) { v.u = now; dirty = true; }
-        for (const k in base) if (!(k in loc)) { del[k] = now; dirty = true; }
+    for (let tries = 0; tries < 3; tries++) {
+      const now = Date.now(), loc = recs(), base = SY.base || {}, first = !SY.cur, out = [];
+      for (const [k, v] of Object.entries(loc)) {
+        if (first) out.push({ k, v, u: v.u || 1 });
+        else if (base[k] !== hash(JSON.stringify(v))) { v.u = now; out.push({ k, v, u: now }); }
       }
-      if (!dirty && !force && !first && now - (SY.last || 0) < 30000) break;
+      if (!first) for (const k in base) if (!(k in loc)) out.push({ k, v: null, u: now });
+      if (!out.length && !force && !first && now - (SY.last || 0) < 30000) break;
       const before = hash(JSON.stringify(loc));
-      const row = (await api(`gymlog?select=data,rev&user_id=eq.${SY.uid}`))[0];
-      const R = row?.data || { recs: {}, del: {} }, D = { ...R.del }, M = {};
-      for (const k in del) D[k] = Math.max(D[k] || 0, del[k]);
-      for (const k of new Set([...Object.keys(loc), ...Object.keys(R.recs)])) {
-        const a = loc[k], b = R.recs[k], pick = !a ? b : !b ? a : (a.u || 0) > (b.u || 0) ? a : b; // 동률이면 서버 우선
-        if (!(D[k] >= (pick.u || 0))) M[k] = pick;
-      }
-      const data = { recs: M, del: D }, changedRemote = JSON.stringify(data) !== JSON.stringify(R);
-      if (changedRemote) {
-        const ok = row
-          ? (await api(`gymlog?user_id=eq.${SY.uid}&rev=eq.${row.rev}`, 'PATCH', { data, rev: row.rev + 1, updated_at: new Date().toISOString() }, 'return=representation'))?.length
-          : await api('gymlog', 'POST', { user_id: SY.uid, data, rev: 1 }, 'return=minimal');
-        if (!ok) continue; // 다른 기기가 먼저 올림 -> 다시 받아서 병합
+      for (let i = 0; i < out.length; i += 500) await api('rpc/gymlog_push', 'POST', { rows: out.slice(i, i + 500) });
+      // 받기: 지난 커서 이후 바뀐 행 (1000개씩)
+      const since = first ? 0 : Date.parse(SY.cur) - PULL_OVERLAP, rows = [];
+      for (let off = 0; ; off += 1000) {
+        const page = await api(`gymlog_recs?select=k,v,u,at:updated_at&updated_at=gt.${new Date(since).toISOString()}&order=updated_at.asc,k.asc&limit=1000&offset=${off}`);
+        rows.push(...page); if (page.length < 1000) break;
       }
       if (hash(JSON.stringify(recs())) !== before) continue; // 동기화 중 로컬이 바뀜 -> 다시
-      const changedLocal = JSON.stringify(M) !== JSON.stringify(loc);
-      fromRecs(M);
+      const M = { ...loc };
+      let changed = false;
+      for (const r of rows) {
+        const cur = M[r.k];
+        if (cur && (cur.u || 0) >= r.u) continue;
+        if (r.v === null) { if (cur) { delete M[r.k]; changed = true; } }
+        else { M[r.k] = r.v; changed = true; }
+      }
+      if (changed) fromRecs(M);
       SY.base = Object.fromEntries(Object.entries(M).map(([k, v]) => [k, hash(JSON.stringify(v))]));
+      SY.cur = new Date(rows.reduce((m, r) => Math.max(m, Date.parse(r.at) || 0), Date.parse(SY.cur) || 0)).toISOString();
       SY.last = Date.now();
       localStorage.setItem(KEY, JSON.stringify(S));
-      if (changedLocal && !ui.view && !ui.modal && !document.activeElement?.matches('input,textarea')) render();
+      if (changed && !ui.view && !ui.modal && !document.activeElement?.matches('input,textarea')) render();
       break;
     }
     SY.state = '';
@@ -98,7 +102,7 @@ Object.assign(A, {
       await afterLogin(j);
     } catch (e) { toast('실패: ' + e.message); }
   },
-  logout() { if (!confirm('로그아웃할까요? 이 기기의 기록은 그대로 남아요.')) return; Object.assign(SY, { at: null, rt: null, exp: 0, last: 0 }); sySave(); render(); },
+  logout() { if (!confirm('로그아웃할까요? 이 기기의 기록은 그대로 남아요.')) return; Object.assign(SY, { at: null, rt: null, exp: 0, last: 0, cur: null }); sySave(); render(); },
   google() {
     if (!SY.url || !SY.key) return toast('Supabase URL·키를 입력하세요');
     sySave(); location.href = `${SY.url}/auth/v1/authorize?provider=google&redirect_to=${encodeURIComponent(location.origin + location.pathname)}`;
@@ -106,7 +110,7 @@ Object.assign(A, {
   async syncNow() { await sync(true); render(); toast(SY.state || '동기화 완료'); },
 });
 async function afterLogin(j) {
-  const prev = SY.uid; setSession(j); if (SY.uid !== prev) SY.base = null;
+  const prev = SY.uid; setSession(j); if (SY.uid !== prev) { SY.base = null; SY.cur = null; }
   await sync(true); if (ui.modal?.k === 'account') ui.modal = null; render(); toast('로그인했어요. 동기화 켜짐');
 }
 // 구글 로그인 후 돌아오면 주소 #뒤에 토큰이 붙어 옴

@@ -1,17 +1,32 @@
 -- Supabase SQL Editor에 통째로 붙여넣고 Run. 여러 번 돌려도 안전 (if not exists / drop policy if exists).
--- 기록 동기화: 유저당 한 행에 전체 기록(jsonb) 저장.
-create table if not exists public.gymlog (
-  user_id uuid primary key default auth.uid() references auth.users on delete cascade,
-  data jsonb not null,
-  rev bigint not null default 1,
-  updated_at timestamptz not null default now()
+-- ===== 기록 동기화 =====
+-- 기록 하나(운동·루틴·신체·직접 만든 운동·설정) = 한 행. k: 'w:<id>' 'r:<id>' 'b:<날짜>' 'c:<이름>' 'set'
+-- u: 기기에서 고친 시각(ms). v가 null이면 삭제 표시. updated_at: 서버가 받은 시각 (기기는 이걸로 바뀐 것만 받음)
+create table if not exists public.gymlog_recs (
+  user_id uuid not null default auth.uid() references auth.users on delete cascade,
+  k text not null check (char_length(k) <= 200),
+  v jsonb check (v is null or octet_length(v::text) < 500000),
+  u bigint not null,
+  updated_at timestamptz not null default now(),
+  primary key (user_id, k)
 );
-alter table public.gymlog enable row level security;
-drop policy if exists "own row" on public.gymlog;
-create policy "own row" on public.gymlog for all to authenticated
+create index if not exists gymlog_recs_user_time on public.gymlog_recs (user_id, updated_at);
+alter table public.gymlog_recs enable row level security;
+drop policy if exists "own row" on public.gymlog_recs;
+create policy "own row" on public.gymlog_recs for all to authenticated
   using ((select auth.uid()) = user_id) with check ((select auth.uid()) = user_id);
-grant select, insert, update, delete on public.gymlog to authenticated;
-
+grant select, insert, update on public.gymlog_recs to authenticated;
+-- 올리기: 서버에 있는 것보다 새 것(u가 큰 것)만 씀. 조회하는 사람 권한으로 실행 (RLS 적용)
+create or replace function public.gymlog_push(rows jsonb) returns void
+language sql security invoker set search_path = '' as $$
+  insert into public.gymlog_recs (user_id, k, v, u)
+  select (select auth.uid()), r->>'k', case when jsonb_typeof(r->'v') = 'null' then null else r->'v' end, (r->>'u')::bigint
+  from jsonb_array_elements(rows) r
+  on conflict (user_id, k) do update set v = excluded.v, u = excluded.u, updated_at = now()
+  where public.gymlog_recs.u < excluded.u;
+$$;
+revoke execute on function public.gymlog_push(jsonb) from public, anon;
+grant execute on function public.gymlog_push(jsonb) to authenticated;
 
 -- ===== 프로그램 공유 =====
 -- 루틴 폴더 하나 = 프로그램. 로그인한 사용자 누구나 읽기, 쓰기·삭제는 본인 것만

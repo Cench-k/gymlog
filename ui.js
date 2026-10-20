@@ -479,7 +479,7 @@ const A = {
   importData() { $('#importFile').click(); },
   resetAll() {
     if (!confirm(`이 기기의 모든 기록·루틴·설정을 지웁니다.${SY.rt ? ' 서버 기록은 남기고 로그아웃해요.' : ' 되돌릴 수 없어요.'} 계속할까요?`)) return;
-    Object.assign(SY, { at: null, rt: null, exp: 0, base: null, last: 0 }); sySave(); S = blank(); save(); indexEx(); render();
+    Object.assign(SY, { at: null, rt: null, exp: 0, base: null, last: 0, cur: null }); sySave(); S = blank(); save(); indexEx(); render();
   },
 };
 
