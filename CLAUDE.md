@@ -31,6 +31,16 @@
 - **DB 변경**: supabase.sql에 추가 → Supabase SQL Editor에서 실행 → test_sync.py 가짜 서버도 같은 동작으로 맞춤.
 - **배포**: core.js `APP_VER` 올림 → 테스트 → `git push` (Pages가 main에서 바로 배포). 폰은 앱을 두 번째 열 때 새 버전.
 
+## 앱 (Capacitor 8, 안드로이드·iOS)
+
+같은 웹 코드를 앱으로 감싼다. 웹은 그대로 GitHub Pages, 앱은 스토어.
+- `npm run build`: sw.js의 캐시 목록대로 파일을 `www/`로 복사 (앱에 들어갈 파일 목록은 sw.js 한 곳에서만 관리)
+- `npm run sync`: build + `npx cap sync` (android/ios 폴더에 반영). 웹 코드를 고친 뒤 앱 빌드 전에 항상 실행
+- `npm run android`: sync 후 Android Studio 열기 → 실행·서명·AAB 빌드
+- 앱 ID `com.cenchk.gymlog` (스토어 첫 업로드 후엔 못 바꿈). 아이콘·스플래시 원본은 `assets/`, 바꾸면 `npx capacitor-assets generate --android`
+- 앱 안에서는 서비스 워커를 끈다 (app.js). `window.Capacitor?.isNativePlatform?.()`로 앱/웹 구분
+- 웹뷰 안 구글 로그인은 구글이 막는다 → 앱에서는 네이티브 로그인 플러그인 필요 (출시 전 작업)
+
 ## 의견 반영 흐름
 
 사용자가 설정 → 의견 보내기로 쓴 글은 `gymlog_feedback` 표에 쌓인다 (앱 버전·기기 정보 포함). `status`(new·seen·done·wont)와 `reply`를 고치면 사용자의 "내 의견"에 그대로 보인다.
