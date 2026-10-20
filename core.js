@@ -2,7 +2,7 @@
 // 짐로그: 운동 기록 PWA. 상태 전부 localStorage 한 키에 JSON으로 저장.
 // ponytail: localStorage 약 5MB 한도(운동 기록 수년치는 충분), 넘치면 IndexedDB로 이전.
 
-const APP_VER = '2026.10.20'; // 배포할 때 올림. 의견 보내기에 같이 저장돼 어느 버전 문제인지 앎
+const APP_VER = '2026.10.20.2'; // 배포할 때 올림. 의견 보내기에 같이 저장돼 어느 버전 문제인지 앎
 const KEY = 'gymlog.v1';
 const DEF = { height: 175, rest: 90, vibrate: true, sound: true, wake: true, autoRoutine: 'same', rpe: false, nick: '', fav: [], setN: 3, setR: 10, dbs: '', stepB: 2.5, stepD: 2, stepM: 5, restW: 60, warmEx: true, weekStart: 1, ivWork: 20, ivRest: 10, ivRounds: 8, bar: 20, plates: '25,20,15,10,5,2.5,1.25' };
 const TYPES = { N: '일반', W: '웜업', D: '드롭', F: '실패', P: '피더', R: '레스트-퍼즈' };
@@ -169,11 +169,10 @@ document.addEventListener('visibilitychange', () => { if (!document.hidden && ui
 
 // ---------- 운동 그림 · 근육 지도 ----------
 const IMG_BASE = 'https://cdn.jsdelivr.net/gh/yuhonas/free-exercise-db@f00c92c7dcf1216a928a52c3706c7ce8e2f71ed5/exercises/';
-const GIF_BASE = 'https://static.exercisedb.dev/media/'; // ExerciseDB 무료 V1 애니메이션. 실패하면 사진으로 대체
 const MUSCLE_POLY = { chest: ['chest'], shoulders: ['front-deltoids', 'back-deltoids'], triceps: ['triceps'], biceps: ['biceps'], lats: ['upper-back'], 'middle back': ['upper-back'], 'lower back': ['lower-back'], traps: ['trapezius'], abdominals: ['abs', 'obliques'], quadriceps: ['quadriceps'], hamstrings: ['hamstring'], glutes: ['gluteal'], calves: ['calves', 'left-soleus', 'right-soleus'], forearms: ['forearm'], adductors: ['adductor'], abductors: ['abductors'], neck: ['neck'] };
 function exMedia(name) {
   const m = MEDIA[name], [p, s] = m?.[1] ? [m[1], m[2]] : PART_MUSCLE[ex(name).part] || ['', ''];
-  return { img: m?.[0] && IMG_BASE + m[0] + '/', gif: m?.[3] && GIF_BASE + m[3] + '.gif', p: p ? p.split(',') : [], s: s ? s.split(',') : [] };
+  return { img: m?.[0] && IMG_BASE + m[0] + '/', p: p ? p.split(',') : [], s: s ? s.split(',') : [] };
 }
 function bodyMap(p, s) {
   const hi = {};
@@ -185,13 +184,12 @@ function bodyMap(p, s) {
 // ponytail: 썸네일도 원본 jpg(약 70KB)를 씀, 목록이 무거우면 썸네일 생성 서버/빌드로
 const thumb = (name, zoom) => {
   const m = exMedia(name), a = zoom ? ` data-a="zoom:${encodeURIComponent(name)}"` : '';
-  if (m.gif) return `<img class="thumb" loading="lazy" src="${m.gif}" alt=""${a} onerror="${m.img ? `this.onerror=null;this.src='${m.img}0.jpg'` : 'this.style.visibility=`hidden`'}">`;
-  return m.img ? `<img class="thumb" loading="lazy" src="${m.img}0.jpg" alt=""${a}>` : `<span class="thumb ph"${a}>${esc(ex(name).part[0])}</span>`;
+  return m.img ? `<img class="thumb" loading="lazy" src="${m.img}0.jpg" alt="" crossorigin="anonymous"${a}>` : `<span class="thumb ph"${a}>${esc(ex(name).part[0])}</span>`;
 };
 const ko = l => l.map(m => MUSCLE_KO[m] || m).join(', ');
 const mediaHTML = n => {
   const m = exMedia(n);
-  return (m.gif ? `<div class="anim gif"><img src="${m.gif}" alt="" onerror="${m.img ? `this.onerror=null;this.src='${m.img}0.jpg'` : 'this.parentNode.remove()'}"></div>` : m.img ? `<div class="anim"><img src="${m.img}0.jpg" alt=""><img src="${m.img}1.jpg" alt=""></div>` : '') +
+  return (m.img ? `<div class="anim"><img src="${m.img}0.jpg" alt=""><img src="${m.img}1.jpg" alt=""></div>` : '') +
     (m.p.length ? `${bodyMap(m.p, m.s)}<p style="text-align:center;margin:4px 0 12px"><span class="dot p"></span>주동근 <b>${ko(m.p)}</b>${m.s.length ? ` &nbsp;<span class="dot s"></span>보조 ${ko(m.s)}` : ''}</p>` : '');
 };
 

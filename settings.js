@@ -52,7 +52,7 @@ VIEWS.settings = () => `<h1>설정</h1>${SETTINGS().map(([sec, rows]) => `<h2>${
   v === 'toggle' ? `<label class="srow"><span class="sic"><svg viewBox="0 0 24 24">${SI[icon]}</svg></span><span class="grow">${t}</span><span class="tg"><input type="checkbox" data-s="${k}" ${S.set[k] ? 'checked' : ''}></span></label>`
     : `<button class="srow" data-a="${act || 'sOpen:' + k}"><span class="sic"><svg viewBox="0 0 24 24">${SI[icon]}</svg></span><span class="grow">${t}</span><span class="muted sval">${v}</span><span class="chev">›</span></button>`).join('')}</div>`).join('')}
   <div class="sfoot">${SY.rt ? '<button class="ghost" data-a="logout">로그아웃</button>' : ''}<button class="ghost danger" data-a="resetAll">전체 초기화</button></div>
-  <p class="muted small" style="text-align:center">짐로그 ${APP_VER} · 운동 애니메이션: ExerciseDB · 운동 사진: free-exercise-db (Unlicense) · 근육 지도: react-body-highlighter (MIT, © 2020 GV79)</p>`;
+  <p class="muted small" style="text-align:center">짐로그 ${APP_VER} · 운동 사진: free-exercise-db (Unlicense) · 근육 지도: react-body-highlighter (MIT, © 2020 GV79)</p>`;
 
 // 설정 시트
 const fld = (label, k, o = {}) => `<label class="sw">${label}<input data-s="${k}" value="${esc(S.set[k])}" inputmode="${o.mode || 'decimal'}" placeholder="${o.ph || ''}" style="width:${o.w || 90}px"></label>`;

@@ -76,7 +76,7 @@ with sync_playwright() as pw:
     assert '랫 풀다운' in p.inner_text('#picklist')
     # 사진 누르면 크게 보기 -> 거기서 선택
     p.click('#picklist [data-a="zoom:%EB%9E%AB%20%ED%92%80%EB%8B%A4%EC%9A%B4"]')
-    assert p.is_visible('#zoom .anim.gif') and p.evaluate('ui.modal.sel.length') == 0
+    assert p.is_visible('#zoom .anim') and p.evaluate('ui.modal.sel.length') == 0
     p.click('#zoom [data-a^="zoomPick:"]')
     assert not p.locator('#zoom').count() and p.evaluate('ui.modal.sel') == ['랫 풀다운']
     p.click('[data-a="pickDone"]')
@@ -120,12 +120,12 @@ with sync_playwright() as pw:
     p.click('[data-a="tab:stats"]')
     p.click('[data-a^="exd:"] >> nth=0'); assert '추정 1RM' in p.inner_text('#modal')
     # 운동 그림 + 근육 지도
-    assert p.locator('#modal .anim.gif img').count() == 1 and p.locator('#modal polygon.p').count() > 0
+    assert p.locator('#modal .anim img').count() == 2 and p.locator('#modal polygon.p').count() > 0
     assert '주동근' in p.inner_text('#modal')
     p.wait_for_function("[...document.querySelectorAll('#modal .anim img')].every(i=>i.complete&&i.naturalWidth>0)", timeout=15000)
     shot(p, '3b_exdetail'); p.click('[data-a="close"]')
     assert p.evaluate("Object.keys(EX).filter(n=>!MEDIA[n]).length") == 4
-    assert p.evaluate("Object.keys(EX).filter(n=>MEDIA[n]?.[3]).length") == 130
+    assert p.evaluate("Object.values(MEDIA).filter(m=>m.length>3).length") == 0  # 애니메이션(비상업 라이선스) 안 씀
     p.click('[data-a="tab:body"]'); p.fill('#b_w', '75'); p.fill('#b_f', '15'); p.click('[data-a="bodyAdd"]')
     assert 'FFMI' in p.inner_text('#app'); shot(p, '4_body')
     p.click('[data-a="tab:settings"]'); p.check('[data-s="rpe"]')

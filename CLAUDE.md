@@ -26,7 +26,7 @@
 
 ## 자주 하는 작업
 
-- **운동 추가**: data.js 해당 부위에 `[이름, 장비, 타입]` (타입 w=무게×횟수, b=맨몸×횟수, t=시간, c=유산소). media.js `MEDIA`에 `[free-exercise-db 사진 id, 주동근, 보조근, ExerciseDB 애니메이션 id]` (영문 근육명, MUSCLE_KO 참고). 운동 종류는 부위·장비로 자동 (core.js `meta`).
+- **운동 추가**: data.js 해당 부위에 `[이름, 장비, 타입]` (타입 w=무게×횟수, b=맨몸×횟수, t=시간, c=유산소). media.js `MEDIA`에 `[free-exercise-db 사진 id, 주동근, 보조근]` (영문 근육명, MUSCLE_KO 참고). 운동 종류는 부위·장비로 자동 (core.js `meta`).
 - **업적 추가**: level.js `BADGES`에 한 줄.
 - **DB 변경**: supabase.sql에 추가 → Supabase SQL Editor에서 실행 → test_sync.py 가짜 서버도 같은 동작으로 맞춤.
 - **배포**: core.js `APP_VER` 올림 → 테스트 → `git push` (Pages가 main에서 바로 배포). 폰은 앱을 두 번째 열 때 새 버전.
@@ -49,5 +49,6 @@
 ## 주의
 
 - 남이 올린 데이터(공유 링크, 프로그램)는 `unpackR`/`addCustom`에서 값 검사 후 들인다. 화면에 넣는 문자열은 전부 `esc()`.
-- static.exercisedb.dev 애니메이션은 CORS가 없어 결과 카드 이미지에는 free-exercise-db 사진(`still`)을 쓴다.
+- 운동 이미지는 free-exercise-db 사진만 쓴다 (퍼블릭 도메인). ExerciseDB(AscendAPI) 무료 애니메이션은 비상업용 라이선스라 광고 붙는 앱에 못 씀. 애니메이션을 다시 넣으려면 상업 라이선스(예: ExerciseDB.io 구매) 먼저.
+- 근육 지도(react-body-highlighter)는 MIT: 설정 화면의 저작권 표시를 지우지 않는다.
 - Supabase 프로젝트 `ojmfrsikzaengqjjxzxx`는 다른 앱 DB라 절대 쓰지 않는다.
