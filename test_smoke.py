@@ -104,6 +104,7 @@ with sync_playwright() as pw:
     p.fill('[data-f="0:3:w"]', '110')
     p.click('[data-a="finish"]')
     assert '신기록' in p.inner_text('#modal'), p.inner_text('#modal')
+    assert p.locator('#modal .newb .medal').count() >= 1  # 신기록 등 새 업적
     shot(p, '2_summary')
     # 기록 수정 -> 저장 시 개수 유지
     wid = p.evaluate('S.workouts[0].id')
@@ -116,7 +117,9 @@ with sync_playwright() as pw:
     p.click('[data-a^="monthRep:"]'); assert '총 운동 횟수' in p.inner_text('#modal'); p.click('[data-a="close"]')
     # 레벨 카드 + 업적
     p.click('[data-a="tab:home"]'); assert 'Lv.' in p.inner_text('.lvcard')
-    p.click('.lvcard'); assert '첫걸음' in p.inner_text('#modal .badge.ok'); shot(p, '8_level'); p.click('[data-a="close"]')
+    p.click('.lvcard'); assert '첫걸음' in p.inner_text('#modal .special:not(.off)') and '???' in p.inner_text('#modal')
+    p.click('[data-a="bcat:근력"]'); assert '3대 합계' in p.inner_text('#modal') and '꾸준함' not in p.inner_text('#modal .tracks')
+    p.click('[data-a="bcat:특별"]'); p.click('[data-a="bpick:first"]'); assert p.evaluate('S.set.badge') == 'first'; shot(p, '8_level'); p.click('[data-a="close"]')
     p.click('[data-a="tab:stats"]')
     p.click('[data-a^="exd:"] >> nth=0'); assert '추정 1RM' in p.inner_text('#modal')
     # 운동 그림 + 근육 지도

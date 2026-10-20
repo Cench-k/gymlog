@@ -52,7 +52,7 @@
 ## 자주 하는 작업
 
 - **운동 추가**: data.js 해당 부위에 `[이름, 장비, 타입]` (타입 w=무게×횟수, b=맨몸×횟수, t=시간, c=유산소). media.js `MEDIA`에 `[free-exercise-db 사진 id, 주동근, 보조근]` (영문 근육명, MUSCLE_KO 참고). 운동 종류는 부위·장비로 자동 (core.js `meta`).
-- **업적 추가**: level.js `BADGES`에 한 줄.
+- **업적 추가**: level.js `TRACKS`(브론즈~다이아 5단계) 또는 `SPECIALS`(한 번, 숨김 가능)에 한 줄. 필요한 수치는 `gameStats()`에서 계산
 - **DB 변경**: supabase.sql에 추가 → Supabase SQL Editor에서 실행 → test_sync.py 가짜 서버도 같은 동작으로 맞춤.
 - **배포**: core.js `APP_VER` 올림 → 테스트 → `git push` (Pages가 main에서 바로 배포). 폰은 앱을 두 번째 열 때 새 버전.
 

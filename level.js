@@ -1,11 +1,11 @@
 'use strict';
-// 레벨 · 경험치 · 업적. 저장하지 않고 운동 기록에서 매번 계산 (기기 간 자동 일치, 규칙 바꿔도 소급 적용)
+// 레벨 · 경험치 · 업적 · 뱃지. 저장하지 않고 운동 기록에서 매번 계산 (기기 간 자동 일치, 규칙 바꿔도 소급 적용)
+// 업적 추가: TRACKS(단계형) 또는 SPECIALS(한 번) 에 한 줄. 필요한 수치는 gameStats()에서 계산
 
-// 운동 1회 경험치: 기본 50 + 세트당 3 + 볼륨 200kg당 1(최대 100) + 3분당 1(최대 30)
+// 운동 1회 경험치: 기본 50 + 세트당 3 + 볼륨 200kg당 1(최대 100) + 3분당 1(최대 30). 업적 단계마다 보너스
 const xpOf = w => 50 + 3 * wSets(w) + Math.min(100, Math.round(wVol(w) / 200)) + Math.min(30, Math.round((w.end - w.start) / 180000));
 const xpNeed = L => 50 * L * (L - 1); // 레벨 L 시작 경험치: 2레벨 100, 3레벨 300, 4레벨 600 ...
 const levelOf = xp => Math.floor((1 + Math.sqrt(1 + 0.08 * xp)) / 2);
-const totalXP = ws => sum(ws, xpOf);
 
 // 주 단위 연속 기록 (월요일 시작). 이번 주가 비어 있으면 지난주부터 셈
 const weekKey = ts => { const d = new Date(ts); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() - (d.getDay() + 6) % 7); return d.getTime(); };
@@ -19,52 +19,187 @@ function streaks(ws) {
   return { cur, best };
 }
 
-// 업적: [이름, 설명, 조건]
-const BADGES = [
-  ['첫걸음', '첫 운동 기록', st => st.n >= 1],
-  ['꾸준함 10', '운동 10회', st => st.n >= 10],
-  ['꾸준함 50', '운동 50회', st => st.n >= 50],
-  ['꾸준함 100', '운동 100회', st => st.n >= 100],
-  ['300회 클럽', '운동 300회', st => st.n >= 300],
-  ['한 달 개근', '4주 연속 운동', st => st.best >= 4],
-  ['석 달 개근', '12주 연속 운동', st => st.best >= 12],
-  ['1년 개근', '52주 연속 운동', st => st.best >= 52],
-  ['10톤', '총 볼륨 10,000kg', st => st.vol >= 1e4],
-  ['100톤', '총 볼륨 100,000kg', st => st.vol >= 1e5],
-  ['1000톤', '총 볼륨 1,000,000kg', st => st.vol >= 1e6],
-  ['3대 300', '스쿼트·벤치·데드 추정 1RM 합 300kg', st => st.big3 >= 300],
-  ['3대 400', '추정 1RM 합 400kg', st => st.big3 >= 400],
-  ['3대 500', '추정 1RM 합 500kg', st => st.big3 >= 500],
-  ['새벽형 인간', '오전 7시 전에 운동 시작', st => st.dawn],
-  ['철인', '한 번에 2시간 넘게 운동', st => st.long],
-  ['스트레칭 습관', '스트레칭 10회 기록', st => st.stretch >= 10],
+// ---------- 업적 정의 ----------
+const TIERS = [['브론즈', '#C2814F'], ['실버', '#8E99A6'], ['골드', '#E8A800'], ['플래티넘', '#14A6A0'], ['다이아', '#7C5CFF']];
+const TIER_XP = [20, 50, 100, 200, 500];
+const BI = { // 메달 안 그림 (24 viewBox 선)
+  flame: '<path d="M12 3c1 3.5 5 5.5 5 10a5 5 0 0 1-10 0c0-2.2 1-3.5 2-4.5.3 1.5 1 2.5 2 2.5 0-3 0-5 1-8z"/>',
+  cal: '<rect x="4" y="5" width="16" height="15" rx="3"/><path d="M4 10h16M9 3v4M15 3v4"/>',
+  chain: '<path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/>',
+  db: '<path d="M6.5 7v10M17.5 7v10M3.5 9.5v5M20.5 9.5v5M6.5 12h11"/>',
+  mount: '<path d="M3 19l6-10 4 6 2-3 6 7z"/>',
+  layers: '<path d="M12 4l8 4-8 4-8-4zM4 12l8 4 8-4M4 16l8 4 8-4"/>',
+  clock: '<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>',
+  trophy: '<path d="M8 4h8v5a4 4 0 0 1-8 0zM8 6H5a3 3 0 0 0 3 4M16 6h3a3 3 0 0 1-3 4M12 13v4M9 20h6"/>',
+  bolt: '<path d="M13 3L5 13h6l-1 8 8-10h-6z"/>',
+  up: '<path d="M4 18l6-6 4 4 6-8M15 8h5v5"/>',
+  grid: '<rect x="4" y="4" width="7" height="7" rx="2"/><rect x="13" y="4" width="7" height="7" rx="2"/><rect x="4" y="13" width="7" height="7" rx="2"/><rect x="13" y="13" width="7" height="7" rx="2"/>',
+  body: '<circle cx="12" cy="5" r="2"/><path d="M6 9h12M12 9v6M12 15l-3 6M12 15l3 6"/>',
+  route: '<circle cx="6" cy="18" r="2"/><circle cx="18" cy="6" r="2"/><path d="M8 18h6a3 3 0 0 0 0-6h-4a3 3 0 0 1 0-6h6"/>',
+  leaf: '<path d="M5 19c0-8 5-14 14-14 0 9-6 14-14 14zM5 19l7-7"/>',
+  sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.3 5.3l1.4 1.4M17.3 17.3l1.4 1.4M5.3 18.7l1.4-1.4M17.3 6.7l1.4-1.4"/>',
+  moon: '<path d="M19 14.5A7.5 7.5 0 0 1 9.5 5 7.5 7.5 0 1 0 19 14.5z"/>',
+  sofa: '<path d="M4 11V8a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v3M3 11h18v6H3zM5 17v2M19 17v2"/>',
+  hour: '<path d="M7 3h10M7 21h10M8 3c0 5 8 5 8 9s-8 4-8 9M16 3c0 5-8 5-8 9s8 4 8 9"/>',
+  star: '<path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8-5.2-2.7-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z"/>',
+  gift: '<rect x="4" y="9" width="16" height="11" rx="2"/><path d="M3 9h18M12 9v11M12 9c-2-4-6-4-6-1.5S9 9 12 9c3 0 6 1 6-1.5S14 5 12 9"/>',
+  pen: '<path d="M4 20l4-1 11-11-3-3L5 16zM14 6l3 3"/>',
+  scale: '<rect x="4" y="4" width="16" height="16" rx="5"/><path d="M9 10a4 4 0 0 1 6 0l-3 3z"/>',
+  link: '<path d="M8 12h8M6 8H5a4 4 0 0 0 0 8h1M18 8h1a4 4 0 0 1 0 8h-1"/>',
+  drop: '<path d="M12 3s6 7 6 11a6 6 0 0 1-12 0c0-4 6-11 6-11z"/>',
+  list: '<path d="M9 7h11M9 12h11M9 17h11M4.5 7h.01M4.5 12h.01M4.5 17h.01"/>',
+  lock: '<rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/>',
+};
+// [id, 분류, 이름, 그림, 단위, 단계별 기준 5개, 설명]
+const TRACKS = [
+  ['n', '꾸준함', '운동 횟수', 'flame', '회', [10, 50, 100, 300, 1000], '운동을 기록한 횟수'],
+  ['week', '꾸준함', '주간 연속', 'chain', '주', [2, 4, 12, 26, 52], '매주 한 번 이상 운동한 최장 연속 주'],
+  ['day', '꾸준함', '매일 운동', 'cal', '일', [2, 3, 5, 7, 14], '하루도 안 쉬고 운동한 최장 연속 일'],
+  ['month', '꾸준함', '한 달 출석', 'grid', '회', [8, 12, 16, 20, 25], '한 달에 운동한 최다 횟수'],
+  ['vol', '볼륨', '누적 볼륨', 'mount', 'kg', [1e4, 1e5, 5e5, 1e6, 5e6], '들어 올린 무게 × 횟수의 합'],
+  ['maxVol', '볼륨', '하루 볼륨', 'bolt', 'kg', [3000, 5000, 10000, 15000, 25000], '한 번 운동의 최대 볼륨'],
+  ['sets', '볼륨', '누적 세트', 'layers', '세트', [100, 500, 1000, 5000, 10000], '완료한 세트 수'],
+  ['hours', '볼륨', '누적 운동 시간', 'clock', '시간', [10, 50, 100, 300, 1000], '운동한 시간의 합'],
+  ['bench', '근력', '벤치프레스', 'db', 'kg', [60, 80, 100, 120, 140], '바벨 벤치프레스 추정 1RM'],
+  ['squat', '근력', '스쿼트', 'db', 'kg', [80, 100, 140, 180, 220], '바벨 백 스쿼트 추정 1RM'],
+  ['dead', '근력', '데드리프트', 'db', 'kg', [100, 140, 180, 220, 260], '데드리프트 추정 1RM'],
+  ['ohp', '근력', '오버헤드 프레스', 'db', 'kg', [40, 50, 60, 80, 100], '오버헤드 프레스 추정 1RM'],
+  ['big3', '근력', '3대 합계', 'trophy', 'kg', [200, 300, 400, 500, 600], '스쿼트·벤치·데드 추정 1RM 합'],
+  ['pullup', '근력', '풀업', 'body', '회', [5, 10, 15, 20, 30], '풀업 한 세트 최다 횟수'],
+  ['pushup', '근력', '푸시업', 'body', '회', [20, 30, 50, 70, 100], '푸시업 한 세트 최다 횟수'],
+  ['prs', '성장', '신기록', 'up', '번', [5, 20, 50, 100, 300], '운동별 추정 1RM을 경신한 횟수'],
+  ['kinds', '성장', '운동 수집가', 'star', '종', [10, 25, 50, 80, 120], '해 본 운동 종류'],
+  ['p가슴', '부위', '가슴', 'body', '세트', [50, 200, 500, 1000, 2000], '가슴 운동 누적 세트'],
+  ['p등', '부위', '등', 'body', '세트', [50, 200, 500, 1000, 2000], '등 운동 누적 세트'],
+  ['p어깨', '부위', '어깨', 'body', '세트', [50, 200, 500, 1000, 2000], '어깨 운동 누적 세트'],
+  ['p하체', '부위', '하체', 'body', '세트', [50, 200, 500, 1000, 2000], '하체 운동 누적 세트'],
+  ['p팔', '부위', '팔', 'body', '세트', [50, 200, 500, 1000, 2000], '팔 운동 누적 세트'],
+  ['p복근', '부위', '복근', 'body', '세트', [30, 100, 300, 600, 1200], '복근 운동 누적 세트'],
+  ['km', '부위', '유산소 거리', 'route', 'km', [10, 50, 100, 300, 1000], '유산소 누적 거리'],
+  ['stretch', '부위', '스트레칭', 'leaf', '회', [5, 20, 50, 100, 300], '스트레칭 운동 기록 수'],
+  ['dawn', '생활', '새벽형 인간', 'sun', '회', [1, 5, 20, 50, 100], '오전 7시 전에 시작한 운동'],
+  ['night', '생활', '올빼미', 'moon', '회', [1, 5, 20, 50, 100], '밤 10시 이후 시작한 운동'],
+  ['weekend', '생활', '주말 전사', 'sofa', '회', [5, 20, 50, 100, 200], '토·일요일 운동'],
+  ['long', '생활', '철인', 'hour', '회', [1, 5, 20, 50, 100], '90분 넘게 한 운동'],
 ];
+// [id, 이름, 그림, 설명, 조건, 숨김] 숨김 업적은 달성 전엔 이름이 ??? 로 보임
+const SPECIALS = [
+  ['first', '첫걸음', 'star', '첫 운동 기록', st => st.n >= 1],
+  ['club100', '100kg 클럽', 'trophy', '한 세트에 100kg 이상', st => st.maxW >= 100],
+  ['ss', '슈퍼세트', 'link', '슈퍼세트로 운동', st => st.ss],
+  ['drop', '드롭 마스터', 'drop', '드롭 세트 기록', st => st.dropSet],
+  ['warm', '부상 방지', 'flame', '웜업 세트 기록', st => st.warmSet],
+  ['rpe', '자기 객관화', 'up', 'RPE 기록', st => st.rpe],
+  ['memo', '기록광', 'pen', '메모 10개 남기기', st => st.memos >= 10],
+  ['routine', '루틴 설계자', 'list', '루틴 3개 만들기', st => S.routines.length >= 3],
+  ['body', '몸 관리', 'scale', '신체 기록 10회', st => S.body.length >= 10],
+  ['full', '풀코스', 'grid', '한 번에 운동 10종목 이상', st => st.maxItems >= 10, 1],
+  ['twice', '하루 두 탕', 'bolt', '하루에 두 번 운동', st => st.twice, 1],
+  ['newyear', '새해 첫 땀', 'gift', '1월 1일에 운동', st => st.newyear, 1],
+  ['xmas', '메리 크리스마스', 'gift', '12월 25일에 운동', st => st.xmas, 1],
+  ['midnight', '자정의 철인', 'moon', '자정을 넘겨 운동', st => st.midnight, 1],
+];
+
+// ---------- 계산 ----------
+function gameStats() {
+  const ws = [...S.workouts].sort((a, b) => a.start - b.start), DAY = 864e5;
+  const st = { n: ws.length, vol: 0, maxVol: 0, sets: 0, hours: 0, prs: 0, km: 0, stretch: 0, dawn: 0, night: 0, weekend: 0, long: 0, maxW: 0, memos: 0, maxItems: 0, pullup: 0, pushup: 0 };
+  const best = {}, kinds = new Set(), months = {}, days = new Set();
+  for (const w of ws) {
+    const d = new Date(w.start), h = d.getHours(), v = wVol(w), dk = ymd(w.start);
+    st.vol += v; st.maxVol = Math.max(st.maxVol, v); st.sets += wSets(w); st.hours += (w.end - w.start) / 3600e3;
+    st.dawn += h < 7; st.night += h >= 22; st.weekend += d.getDay() % 6 === 0; st.long += w.end - w.start > 90 * 6e4;
+    st.maxItems = Math.max(st.maxItems, w.items.length);
+    if (days.has(dk)) st.twice = true; days.add(dk);
+    months[dk.slice(0, 7)] = (months[dk.slice(0, 7)] || 0) + 1;
+    if (dk.endsWith('-01-01')) st.newyear = true;
+    if (dk.endsWith('-12-25')) st.xmas = true;
+    if (ymd(w.end) !== dk && w.end - w.start < 6 * 3600e3) st.midnight = true;
+    for (const it of w.items) {
+      const e = ex(it.ex), cs = it.sets.filter(counts), s = sessStats(it.sets, e);
+      kinds.add(it.ex); st['p' + e.part] = (st['p' + e.part] || 0) + cs.length;
+      if (e.type === 'c') st.km += sum(cs, x => num(x.w));
+      if (e.cat === '스트레칭') st.stretch++;
+      if (it.memo) st.memos++;
+      if (it.ss) st.ss = true;
+      if (it.sets.some(x => x.type === 'D')) st.dropSet = true;
+      if (it.sets.some(x => x.type === 'W')) st.warmSet = true;
+      if (it.sets.some(x => x.rpe)) st.rpe = true;
+      if (e.type === 'w') st.maxW = Math.max(st.maxW, ...cs.map(x => num(x.w)));
+      if (it.ex === '풀업') st.pullup = Math.max(st.pullup, s.r);
+      if (it.ex === '푸시업') st.pushup = Math.max(st.pushup, s.r);
+      if (s.e1 > (best[it.ex] || 0)) { if (best[it.ex]) st.prs++; best[it.ex] = s.e1; }
+    }
+  }
+  // 매일 연속 최장
+  let run = 0, prev = 0;
+  for (const dk of [...days].sort()) { const t = Date.parse(dk); run = t - prev === DAY ? run + 1 : 1; st.day = Math.max(st.day || 0, run); prev = t; }
+  st.day ||= 0;
+  const { cur, best: bw } = streaks(ws);
+  Object.assign(st, { cur, week: bw, month: Math.max(0, ...Object.values(months)), kinds: kinds.size, hours: Math.floor(st.hours),
+    bench: best[B] || 0, squat: best[SQ] || 0, dead: best[DL] || 0, ohp: best[OHP] || 0 });
+  st.big3 = st.bench + st.squat + st.dead;
+  return st;
+}
+// 업적 상태 + 레벨. earned: 달성한 업적 id 모음 (단계형은 "id:단계")
 function playerStats() {
-  const ws = S.workouts, xp = totalXP(ws), L = levelOf(xp), { cur, best } = streaks(ws);
-  const st = {
-    n: ws.length, xp, L, cur, best, vol: sum(ws, wVol), big3: sum([SQ, B, DL], n => bestOf(n).e1),
-    dawn: ws.some(w => new Date(w.start).getHours() < 7), long: ws.some(w => w.end - w.start > 2 * 3600e3),
-    stretch: sum(ws, w => w.items.filter(it => ex(it.ex).cat === '스트레칭').length),
-  };
-  st.badges = BADGES.map(([name, desc, ok]) => ({ name, desc, ok: !!ok(st) }));
+  const st = gameStats(), earned = new Set();
+  st.tracks = TRACKS.map(([id, cat, name, icon, unit, th, desc]) => {
+    const v = st[id] || 0, tier = th.filter(t => v >= t).length;
+    for (let k = 1; k <= tier; k++) earned.add(`${id}:${k}`);
+    return { id, cat, name, icon, unit, th, desc, v, tier };
+  });
+  st.specials = SPECIALS.map(([id, name, icon, desc, ok, hidden]) => { const got = !!ok(st); if (got) earned.add(id); return { id, name, icon, desc, got, hidden }; });
+  st.earned = earned;
+  st.badgeXP = sum(st.tracks, t => sum(TIER_XP.slice(0, t.tier), x => x)) + 50 * st.specials.filter(s => s.got).length;
+  st.xp = sum(S.workouts, xpOf) + st.badgeXP; st.L = levelOf(st.xp);
+  st.total = TRACKS.length * 5 + SPECIALS.length;
   return st;
 }
 const lvBar = st => { const a = xpNeed(st.L), b = xpNeed(st.L + 1); return Math.round((st.xp - a) / (b - a) * 100); };
 
+// ---------- 그리기 ----------
+// 메달: 단계 색 테두리 + 그림. 못 딴 건 회색
+const medal = (icon, tier, cls = '') => `<span class="medal ${tier ? '' : 'off'} ${cls}" style="--mc:${tier ? TIERS[tier - 1][1] : '#C9C3BC'}"><svg viewBox="0 0 24 24">${BI[icon]}</svg>${tier ? `<i>${'★'.repeat(Math.min(tier, 5))}</i>` : ''}</span>`;
+const fmtV = (v, u) => u === 'kg' && v >= 1e4 ? `${f1(v / 1000)}톤` : `${f1(v)}${u}`;
+// 업적 id → 표시용 {이름, 그림, 단계}
+function badgeInfo(id, st) {
+  const [tid, k] = id.split(':'), t = TRACKS.find(x => x[0] === tid);
+  if (t && k) return { name: `${t[2]} ${TIERS[k - 1][0]}`, icon: t[3], tier: +k };
+  const s = SPECIALS.find(x => x[0] === id);
+  return s ? { name: s[1], icon: s[2], tier: 3 } : null;
+}
+
 function levelCard() {
-  const st = playerStats();
-  return `<div class="card lvcard" data-a="levelOpen"><div class="between"><div><span class="lvnum num">Lv.${st.L}</span></div>
-    <span class="muted small">${st.cur ? `${st.cur}주 연속 · ` : ''}업적 ${st.badges.filter(b => b.ok).length}/${BADGES.length}</span></div>
+  const st = playerStats(), fav = S.set.badge && st.earned.has(S.set.badge) && badgeInfo(S.set.badge);
+  return `<div class="card lvcard" data-a="levelOpen"><div class="between"><div class="row" style="gap:10px">${fav ? medal(fav.icon, fav.tier, 'sm') : ''}<span class="lvnum num">Lv.${st.L}</span></div>
+    <span class="muted small">${st.cur ? `${st.cur}주 연속 · ` : ''}업적 ${st.earned.size}/${st.total}</span></div>
     <div class="lvbar"><div style="width:${lvBar(st)}%"></div></div>
     <div class="muted small">다음 레벨까지 ${(xpNeed(st.L + 1) - st.xp).toLocaleString('ko-KR')} XP</div></div>`;
 }
-MODALS.level = () => {
-  const st = playerStats();
-  return `<div class="between"><h3>Lv.${st.L}</h3>${closeBtn}</div>
+const BCATS = ['전체', '꾸준함', '볼륨', '근력', '성장', '부위', '생활', '특별'];
+MODALS.level = m => {
+  const st = playerStats(), cat = m.cat || '전체';
+  const tracks = st.tracks.filter(t => cat === '전체' || t.cat === cat);
+  const specials = cat === '전체' || cat === '특별' ? st.specials : [];
+  return `<div class="between"><h3>Lv.${st.L} · 업적 ${st.earned.size}/${st.total}</h3>${closeBtn}</div>
     <div class="lvbar" style="margin:12px 0 4px"><div style="width:${lvBar(st)}%"></div></div>
-    <div class="muted small">${st.xp.toLocaleString('ko-KR')} / ${xpNeed(st.L + 1).toLocaleString('ko-KR')} XP · 연속 ${st.cur}주 (최고 ${st.best}주)</div>
-    <h3 style="margin:18px 0 8px">업적</h3>
-    <div class="badges">${st.badges.map(b => `<div class="badge ${b.ok ? 'ok' : ''}"><b>${esc(b.name)}</b><span>${esc(b.desc)}</span></div>`).join('')}</div>
-    <p class="muted small" style="margin-top:14px">경험치: 운동 1회 50 + 세트당 3 + 볼륨 200kg당 1(최대 100) + 3분당 1(최대 30).</p>`;
+    <div class="muted small">${st.xp.toLocaleString('ko-KR')} / ${xpNeed(st.L + 1).toLocaleString('ko-KR')} XP · 업적 보너스 ${st.badgeXP.toLocaleString('ko-KR')} XP · 연속 ${st.cur}주</div>
+    <div class="chips" style="margin:14px 0 10px">${BCATS.map(c => `<button class="chip ${cat === c ? 'on' : ''}" data-a="bcat:${c}">${c}</button>`).join('')}</div>
+    ${tracks.length ? `<div class="tracks">${tracks.map(t => {
+      const next = t.th[t.tier], prevT = t.tier ? t.th[t.tier - 1] : 0, pct = next ? Math.min(100, Math.round((t.v - prevT) / (next - prevT) * 100)) : 100;
+      return `<div class="track" data-a="bpick:${t.tier ? `${t.id}:${t.tier}` : ''}">${medal(t.icon, t.tier)}<div class="grow"><div class="between"><b>${esc(t.name)}</b><span class="tier" style="color:${t.tier ? TIERS[t.tier - 1][1] : 'var(--muted)'}">${t.tier ? TIERS[t.tier - 1][0] : '도전 전'}</span></div>
+        <div class="muted small">${esc(t.desc)}</div><div class="tbar"><div style="width:${pct}%;background:${t.tier < 5 ? TIERS[t.tier][1] : TIERS[4][1]}"></div></div>
+        <div class="muted small">${next ? `${fmtV(t.v, t.unit)} / ${fmtV(next, t.unit)} → ${TIERS[t.tier][0]}` : `${fmtV(t.v, t.unit)} · 최고 단계 달성`}</div></div></div>`;
+    }).join('')}</div>` : ''}
+    ${specials.length ? `<h3 style="margin:18px 0 10px">특별 업적</h3><div class="specials">${specials.map(s => `<div class="special ${s.got ? '' : 'off'}" data-a="bpick:${s.got ? s.id : ''}">${medal(s.got || !s.hidden ? s.icon : 'lock', s.got ? 3 : 0)}<b>${s.got || !s.hidden ? esc(s.name) : '???'}</b><span>${s.got || !s.hidden ? esc(s.desc) : '숨겨진 업적'}</span></div>`).join('')}</div>` : ''}
+    <p class="muted small" style="margin-top:16px">딴 메달을 누르면 대표 뱃지로 홈에 걸려요. 업적 보너스: 브론즈 20 · 실버 50 · 골드 100 · 플래티넘 200 · 다이아 500 · 특별 50 XP</p>`;
 };
-A.levelOpen = () => { ui.modal = { type: 'level' }; renderModal(); };
+Object.assign(A, {
+  levelOpen() { ui.modal = { type: 'level' }; renderModal(); },
+  bcat(c) { ui.modal.cat = c; renderModal(); },
+  bpick(id) { if (!id) return toast('아직 못 딴 업적이에요'); S.set.badge = id; save(); toast(`대표 뱃지: ${badgeInfo(id).name}`); renderModal(); },
+});
+// 운동 끝낼 때 새로 딴 업적 (ui.js finish에서 전후 비교)
+const newBadges = (before, after) => [...after.earned].filter(id => !before.earned.has(id)).map(badgeInfo).filter(Boolean);
+const newBadgeHTML = list => list.length ? `<div class="newb"><b>새 업적 ${list.length}개!</b><div class="newbl">${list.slice(0, 8).map(b => `<div>${medal(b.icon, b.tier, 'sm')}<span>${esc(b.name)}</span></div>`).join('')}</div></div>` : '';

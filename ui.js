@@ -236,7 +236,7 @@ const MODALS = {
   wopen: m => {
     const w = S.workouts.find(x => x.id === m.id); if (!w) return closeBtn;
     const d = new Date(w.start), tab = m.tab || 'sum';
-    return `${m.lv ? `<div class="lvup"><b>레벨 업!</b> Lv.${m.lv} 달성</div>` : ''}${m.prs?.length ? `<div class="pr"><b>신기록</b>${m.prs.map(p => `<div>${esc(p)}</div>`).join('')}</div>` : ''}
+    return `${m.lv ? `<div class="lvup"><b>레벨 업!</b> Lv.${m.lv} 달성</div>` : ''}${newBadgeHTML(m.nb || [])}${m.prs?.length ? `<div class="pr"><b>신기록</b>${m.prs.map(p => `<div>${esc(p)}</div>`).join('')}</div>` : ''}
       <div class="between"><h3>${esc(w.name)}</h3>${closeBtn}</div>
       <div class="seg">${[['sum', '요약'], ['detail', '상세'], ['month', `${d.getMonth() + 1}월`]].map(([k, t]) => `<button class="${tab === k ? 'on' : ''}" data-a="rtab:${k}">${t}</button>`).join('')}</div>
       ${tab === 'detail' ? detailCard(w) : tab === 'month' ? monthCard(d.getFullYear(), d.getMonth()) : sumCard(w)}
@@ -316,13 +316,13 @@ const A = {
     d.items = d.items.filter(it => it.sets.length);
     if (!d.items.length) { if (confirm('기록된 세트가 없어요. 운동을 버릴까요?')) { S.active = null; S.timer = null; save(); ui.view = null; render(); } else render(); return; }
     normSS(d);
-    const prs = findPRs(d), w = { ...d }, L0 = levelOf(totalXP(S.workouts));
+    const prs = findPRs(d), w = { ...d }, P0 = playerStats();
     delete w.editId;
     if (!d.editId) { w.end = Date.now(); updateRoutines(w); }
     S.workouts = S.workouts.filter(x => x.id !== w.id); S.workouts.push(w); S.workouts.sort((a, b) => b.start - a.start);
     S.active = null; S.timer = null; save(); wake(false);
-    const L1 = levelOf(totalXP(S.workouts));
-    ui.view = null; ui.tab = 'home'; ui.modal = { type: 'wopen', id: w.id, prs, lv: !d.editId && L1 > L0 ? L1 : 0 }; scrollTo(0, 0); render();
+    const P1 = playerStats(), nb = d.editId ? [] : newBadges(P0, P1);
+    ui.view = null; ui.tab = 'home'; ui.modal = { type: 'wopen', id: w.id, prs, nb, lv: !d.editId && P1.L > P0.L ? P1.L : 0 }; scrollTo(0, 0); render();
   },
   // 세트
   done(i, j) {
