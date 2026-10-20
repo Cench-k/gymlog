@@ -2,6 +2,12 @@
 
 운동 기록 PWA. 빌드 도구 없음: 정적 파일을 GitHub Pages(https://cench-k.github.io/gymlog/)로 배포. 서버는 Supabase(프로젝트 ref `kbotdssaktcsdbvqlwvq`) 하나.
 
+## 세션 규칙 (PC 여러 대에서 번갈아 작업)
+
+- 세션을 시작하면 먼저 `git pull`로 다른 PC에서 한 작업을 받는다.
+- 작업 단위가 끝나면 테스트 통과 확인 후 커밋하고 push한다. 사용자가 PC를 옮겨도 이어지게, 커밋 안 한 채로 끝내지 않는다.
+- push는 곧 웹 배포다 (GitHub Pages). 배포하면 안 되는 미완성 작업은 브랜치에서 하고 main에 합치지 않는다.
+
 ## 새 PC에서 이어서 하기
 
 1. `git clone https://github.com/Cench-k/gymlog.git` (GitHub 로그인: `gh auth login`)
